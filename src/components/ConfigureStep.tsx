@@ -1,20 +1,22 @@
-import { SUBSCRIPTION_PRICES } from '@letterboxd-wrappd/domain/streaming'
+import { SERVICES, serviceMonthly } from '@letterboxd-wrappd/domain/streaming'
 import { formatMoney } from '../lib/explain'
 
 type Props = {
   filmCount: number
   source: string
   region: string
-  ownedServices: number[]
+  ownedServices: string[]
   maxServices: number | null
+  includeLibraryFree: boolean
   running: boolean
-  onToggleOwned: (id: number) => void
+  onToggleOwned: (slug: string) => void
+  onToggleLibrary: () => void
   onRegionChange: (region: string) => void
   onMaxServicesChange: (max: number | null) => void
   onRun: () => void
 }
 
-const REGIONS = Object.keys(SUBSCRIPTION_PRICES)
+const REGIONS = Object.keys(SERVICES)
 const MAX_OPTIONS: Array<{ label: string; value: number | null }> = [
   { label: 'Any', value: null },
   { label: '1', value: 1 },
@@ -47,16 +49,17 @@ export default function ConfigureStep({
   region,
   ownedServices,
   maxServices,
+  includeLibraryFree,
   running,
   onToggleOwned,
+  onToggleLibrary,
   onRegionChange,
   onMaxServicesChange,
   onRun,
 }: Props) {
-  const services = Object.entries(SUBSCRIPTION_PRICES[region] ?? {}).map(([id, s]) => ({
-    id: Number(id),
-    ...s,
-  }))
+  // Only paid subscriptions are "services you pay for"; free ones are handled
+  // automatically and surfaced in the results.
+  const paidServices = (SERVICES[region] ?? []).filter((s) => s.kind === 'paid')
 
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%', maxWidth: 640 }}>
@@ -98,21 +101,35 @@ export default function ConfigureStep({
           We&rsquo;ll treat these as free and only recommend what to add.
         </p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-          {services.map((s) => {
-            const active = ownedServices.includes(s.id)
+          {paidServices.map((s) => {
+            const active = ownedServices.includes(s.slug)
             return (
               <button
-                key={s.id}
+                key={s.slug}
                 type="button"
                 aria-pressed={active}
-                onClick={() => onToggleOwned(s.id)}
+                onClick={() => onToggleOwned(s.slug)}
                 style={chip(active)}
               >
-                {s.name} · {formatMoney(s.monthly)}
+                {s.name} · {formatMoney(serviceMonthly(s, 'cheapest') ?? 0)}
               </button>
             )
           })}
         </div>
+      </div>
+
+      <div style={card}>
+        <button
+          type="button"
+          aria-pressed={includeLibraryFree}
+          onClick={onToggleLibrary}
+          style={{ ...chip(includeLibraryFree), padding: '0.4rem 0.9rem' }}
+        >
+          {includeLibraryFree ? '✓ ' : ''}I have a library card (Kanopy &amp; Hoopla)
+        </button>
+        <p style={{ margin: '0.5rem 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+          Free with a library card. Free ad-supported services (Tubi, Pluto&hellip;) are always counted.
+        </p>
       </div>
 
       <div style={card}>
@@ -134,7 +151,7 @@ export default function ConfigureStep({
 
       <div style={{ ...card, opacity: 0.75 }}>
         <p style={{ margin: '0 0 0.5rem', fontSize: '0.9rem' }}>
-          Quality &amp; audio <span style={{ color: 'var(--accent-2)', fontSize: '0.75rem' }}>· coming in V2</span>
+          Quality &amp; audio <span style={{ color: 'var(--accent-2)', fontSize: '0.75rem' }}>· coming soon</span>
         </p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
           {['4K', 'HDR', 'Original audio', '5.1 / Atmos'].map((t) => (

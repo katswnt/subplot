@@ -1,9 +1,9 @@
-import { SUBSCRIPTION_PRICES, type StreamingResult } from '@letterboxd-wrappd/domain/streaming'
+import { serviceBySlug, type StreamingResult } from '@letterboxd-wrappd/domain/streaming'
 
 /** Pure formatters that turn an optimizer result into human-readable copy. */
 
-export const serviceLabel = (region: string, id: number): string =>
-  SUBSCRIPTION_PRICES[region]?.[id]?.name ?? `#${id}`
+export const serviceLabel = (region: string, slug: string): string =>
+  serviceBySlug[region]?.[slug]?.name ?? slug
 
 export const formatMoney = (n: number): string => `$${n.toFixed(2)}`
 

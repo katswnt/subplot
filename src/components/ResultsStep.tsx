@@ -20,6 +20,47 @@ export default function ResultsStep({ result, unresolvedCount = 0, onStartOver }
 
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%', maxWidth: 640 }}>
+      {/* Free — what you can already watch at no cost */}
+      {result.free.length > 0 && (
+        <div style={{ ...card, borderColor: 'var(--good)' }}>
+          <p
+            style={{
+              margin: 0,
+              color: 'var(--good)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+              fontSize: '0.72rem',
+              fontWeight: 700,
+            }}
+          >
+            Free
+          </p>
+          <h2 style={{ margin: '0.35rem 0 0.6rem', fontSize: '1.3rem' }} data-testid="free-summary">
+            You can already watch {result.freeCoveredCount} of your films free.
+          </h2>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+            {result.free.map((f) => (
+              <span
+                key={f.slug}
+                data-testid="free-service"
+                style={{
+                  background: 'var(--surface-raised)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 999,
+                  padding: '0.25rem 0.7rem',
+                  fontSize: '0.85rem',
+                }}
+              >
+                {f.kind === 'free-library' ? '📚' : '▶'} {serviceLabel(result.region, f.slug)} · {f.coveredCount}
+              </span>
+            ))}
+          </div>
+          <p style={{ margin: '0.6rem 0 0', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+            📚 needs a library card · ▶ free with ads
+          </p>
+        </div>
+      )}
+
       {/* Recommended combo */}
       <div style={{ ...card, borderColor: 'var(--accent)' }}>
         <p
@@ -91,8 +132,8 @@ export default function ResultsStep({ result, unresolvedCount = 0, onStartOver }
       {result.orphans.length > 0 && (
         <div style={card}>
           <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.9rem' }} data-testid="orphans-note">
-            {result.orphans.length} film{result.orphans.length === 1 ? '' : 's'} aren&rsquo;t on any tracked
-            subscription — rent/buy pricing is coming soon.
+            {result.orphans.length} film{result.orphans.length === 1 ? '' : 's'} aren&rsquo;t streaming anywhere we
+            track (free or paid) — rent/buy pricing is coming soon.
           </p>
         </div>
       )}

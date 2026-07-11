@@ -22,7 +22,8 @@ export default function App() {
   const [films, setFilms] = useState<ImportedFilm[]>([])
   const [source, setSource] = useState<ImportSource>('unknown')
   const [region, setRegion] = useState('US')
-  const [owned, setOwned] = useState<number[]>([])
+  const [owned, setOwned] = useState<string[]>([])
+  const [includeLibraryFree, setIncludeLibraryFree] = useState(true)
   const [maxServices, setMaxServices] = useState<number | null>(null)
   const [running, setRunning] = useState(false)
   const [progress, setProgress] = useState<{ pct: number; label: string } | null>(null)
@@ -36,8 +37,8 @@ export default function App() {
     setPhase('configure')
   }
 
-  const toggleOwned = (id: number) =>
-    setOwned((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+  const toggleOwned = (slug: string) =>
+    setOwned((prev) => (prev.includes(slug) ? prev.filter((x) => x !== slug) : [...prev, slug]))
 
   const run = async () => {
     setRunning(true)
@@ -45,7 +46,7 @@ export default function App() {
     setProgress({ pct: 0, label: 'Reading your watchlist…' })
     const outcome = await runOptimization(
       films,
-      { region, ownedServices: owned, maxServices: maxServices ?? undefined },
+      { region, ownedServices: owned, maxServices: maxServices ?? undefined, includeLibraryFree },
       (p) => setProgress(progressView(p)),
     )
     setRunning(false)
@@ -112,8 +113,10 @@ export default function App() {
             region={region}
             ownedServices={owned}
             maxServices={maxServices}
+            includeLibraryFree={includeLibraryFree}
             running={running}
             onToggleOwned={toggleOwned}
+            onToggleLibrary={() => setIncludeLibraryFree((v) => !v)}
             onRegionChange={setRegion}
             onMaxServicesChange={setMaxServices}
             onRun={run}

@@ -14,8 +14,12 @@ import type { ImportedFilm } from '@letterboxd-wrappd/domain/imports'
 
 export type OptimizeConfig = {
   region: string
-  ownedServices: number[]
+  /** Canonical service slugs the user already pays for. */
+  ownedServices: string[]
   maxServices?: number
+  includeLibraryFree?: boolean
+  tierPolicy?: 'cheapest' | 'adfree'
+  maxBudget?: number
 }
 
 export type PipelineOutcome =
@@ -126,7 +130,14 @@ export async function runOptimization(
   const streamingFilms: StreamingFilm[] = films.map((f) => {
     const tmdbId = keyToTmdb[f.key]
     const providers = tmdbId != null ? providersById[tmdbId] : undefined
-    const providerIds = (providers?.flatrate ?? []).map((p) => p.providerId)
+    // Union every bucket a film can be watched in — subscription (flatrate),
+    // free (Kanopy/Hoopla), and free-with-ads (Tubi/Pluto). The catalog decides
+    // which are free vs paid; the optimizer canonicalizes the raw ids.
+    const providerIds = [
+      ...(providers?.flatrate ?? []),
+      ...(providers?.free ?? []),
+      ...(providers?.ads ?? []),
+    ].map((p) => p.providerId)
     return { key: f.key, title: f.title, providerIds }
   })
 
@@ -134,6 +145,9 @@ export async function runOptimization(
     region: config.region,
     ownedServices: config.ownedServices,
     maxServices: config.maxServices,
+    includeLibraryFree: config.includeLibraryFree,
+    tierPolicy: config.tierPolicy,
+    maxBudget: config.maxBudget,
   })
 
   return { ok: true, result, unresolvedCount }
