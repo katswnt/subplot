@@ -1,4 +1,4 @@
-import { SUBSCRIPTION_PRICES, type StreamingResult, type Combo } from '@letterboxd-wrappd/domain/streaming'
+import { SUBSCRIPTION_PRICES, type StreamingResult } from '@letterboxd-wrappd/domain/streaming'
 
 /** Pure formatters that turn an optimizer result into human-readable copy. */
 
@@ -29,35 +29,36 @@ export function describeRecommended(result: StreamingResult): string {
 }
 
 export type MarginalStep = {
-  addedNames: string[]
+  /** The single service added at this step. */
+  name: string
   coveredCount: number
+  /** Cumulative $/mo after this step. */
   monthlyCost: number
-  /** Films this step unlocks over the previous frontier point. */
+  /** New films this service unlocks over everything added before it. */
   addFilms: number
-  /** Extra $/mo this step costs over the previous frontier point. */
+  /** This service's own $/mo. */
   addCost: number
   /** Whether this step is at or below the recommended knee. */
   recommended: boolean
 }
 
-/** The cost-vs-coverage frontier as incremental "add X for +N films (+$Y)" steps. */
+/**
+ * The greedy marginal path as "add X for +N new films (+$Y)" steps — one row
+ * per service, best-value first. Because it's a nested chain, each service
+ * appears once and films shared across services are never double-counted.
+ */
 export function marginalSteps(result: StreamingResult): MarginalStep[] {
-  const steps: MarginalStep[] = []
-  let prev: Combo | null = null
-  for (const c of result.frontier) {
-    if (c.addedServices.length === 0) {
-      prev = c
-      continue
+  let prevCost = 0
+  return result.marginalPath.map((m) => {
+    const step: MarginalStep = {
+      name: serviceLabel(result.region, m.serviceId),
+      coveredCount: m.coveredCount,
+      monthlyCost: m.monthlyCost,
+      addFilms: m.addedFilms,
+      addCost: Math.round((m.monthlyCost - prevCost) * 100) / 100,
+      recommended: m.monthlyCost <= result.recommended.monthlyCost,
     }
-    steps.push({
-      addedNames: c.addedServices.map((id) => serviceLabel(result.region, id)),
-      coveredCount: c.coveredCount,
-      monthlyCost: c.monthlyCost,
-      addFilms: c.coveredCount - (prev?.coveredCount ?? 0),
-      addCost: Math.round((c.monthlyCost - (prev?.monthlyCost ?? 0)) * 100) / 100,
-      recommended: c.monthlyCost <= result.recommended.monthlyCost,
-    })
-    prev = c
-  }
-  return steps
+    prevCost = m.monthlyCost
+    return step
+  })
 }

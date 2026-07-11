@@ -62,7 +62,7 @@ export default function ResultsStep({ result, unresolvedCount = 0, onStartOver }
       {steps.length > 0 && (
         <div style={card}>
           <p style={{ margin: '0 0 0.6rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-            Each service you add, cheapest first:
+            Each service you&rsquo;d add, biggest coverage gain first:
           </p>
           <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
             {steps.map((s, i) => (
@@ -76,7 +76,7 @@ export default function ResultsStep({ result, unresolvedCount = 0, onStartOver }
                   opacity: s.recommended ? 1 : 0.55,
                 }}
               >
-                <span style={{ fontWeight: 600 }}>+{s.addedNames[s.addedNames.length - 1]}</span>
+                <span style={{ fontWeight: 600 }}>+{s.name}</span>
                 <span style={{ color: 'var(--good)', fontSize: '0.85rem' }}>+{s.addFilms} films</span>
                 <span style={{ marginLeft: 'auto', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                   +{formatMoney(s.addCost)} → {formatMoney(s.monthlyCost)}/mo
