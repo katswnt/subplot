@@ -1,14 +1,58 @@
-import { SUBSCRIPTION_PRICES } from '@letterboxd-wrappd/domain'
+import { useState } from 'react'
+import type { ImportedFilm, ImportSource, StreamingResult } from '@letterboxd-wrappd/domain'
+import ImportStep from './components/ImportStep'
+import ConfigureStep from './components/ConfigureStep'
+import ResultsStep from './components/ResultsStep'
+import { runOptimization } from './lib/pipeline'
 
-/**
- * Subplot — app shell (slice 4).
- *
- * Wires the workspace packages and stands up the landing hero. The full
- * import → configure → results flow lands in slice 5; for now this proves the
- * domain optimizer + price table resolve through Vite's workspace aliases.
- */
+type Phase = 'import' | 'configure' | 'results'
+
 export default function App() {
-  const services = Object.values(SUBSCRIPTION_PRICES.US)
+  const [phase, setPhase] = useState<Phase>('import')
+  const [films, setFilms] = useState<ImportedFilm[]>([])
+  const [source, setSource] = useState<ImportSource>('unknown')
+  const [region, setRegion] = useState('US')
+  const [owned, setOwned] = useState<number[]>([])
+  const [maxServices, setMaxServices] = useState<number | null>(null)
+  const [running, setRunning] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [result, setResult] = useState<StreamingResult | null>(null)
+  const [unresolved, setUnresolved] = useState(0)
+
+  const handleImported = (src: ImportSource, imported: ImportedFilm[]) => {
+    setSource(src)
+    setFilms(imported)
+    setPhase('configure')
+  }
+
+  const toggleOwned = (id: number) =>
+    setOwned((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+
+  const run = async () => {
+    setRunning(true)
+    setError(null)
+    const outcome = await runOptimization(films, {
+      region,
+      ownedServices: owned,
+      maxServices: maxServices ?? undefined,
+    })
+    setRunning(false)
+    if (!outcome.ok) {
+      setError(outcome.error)
+      return
+    }
+    setResult(outcome.result)
+    setUnresolved(outcome.unresolvedCount)
+    setPhase('results')
+  }
+
+  const startOver = () => {
+    setPhase('import')
+    setFilms([])
+    setResult(null)
+    setError(null)
+    setOwned([])
+  }
 
   return (
     <main
@@ -17,13 +61,11 @@ export default function App() {
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: 'center',
-        gap: '1.5rem',
-        padding: '2rem',
-        textAlign: 'center',
+        gap: '2rem',
+        padding: '3rem 1.25rem 4rem',
       }}
     >
-      <div style={{ maxWidth: 640 }}>
+      <header style={{ textAlign: 'center', maxWidth: 640 }}>
         <p
           style={{
             color: 'var(--accent)',
@@ -36,48 +78,44 @@ export default function App() {
         >
           Subplot
         </p>
-        <h1 style={{ fontSize: '2.5rem', lineHeight: 1.1, margin: '0.5rem 0 0.75rem' }}>
+        <h1 style={{ fontSize: '2rem', lineHeight: 1.1, margin: '0.4rem 0 0.5rem' }}>
           The cheapest way to watch your watchlist
         </h1>
-        <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem', margin: 0 }}>
-          Import your Letterboxd or IMDb watchlist and Subplot finds the lowest-cost
-          combination of streaming subscriptions that covers the most of it.
-        </p>
-      </div>
+        {phase === 'import' && (
+          <p style={{ color: 'var(--text-muted)', margin: 0 }}>
+            Import your Letterboxd or IMDb watchlist and we&rsquo;ll find the lowest-cost combination of
+            streaming subscriptions that covers the most of it.
+          </p>
+        )}
+      </header>
 
-      <div
-        style={{
-          background: 'var(--surface-card)',
-          border: '1px solid var(--border)',
-          borderRadius: 16,
-          padding: '1.25rem 1.5rem',
-          maxWidth: 640,
-        }}
-      >
-        <p style={{ margin: '0 0 0.5rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-          Optimizing across {services.length} US subscription services
-        </p>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', justifyContent: 'center' }}>
-          {services.map((s) => (
-            <span
-              key={s.name}
-              style={{
-                background: 'var(--surface-raised)',
-                border: '1px solid var(--border)',
-                borderRadius: 999,
-                padding: '0.25rem 0.7rem',
-                fontSize: '0.8rem',
-              }}
-            >
-              {s.name}
-            </span>
-          ))}
-        </div>
-      </div>
+      {phase === 'import' && <ImportStep onImported={handleImported} />}
 
-      <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-        Import flow coming next. Streaming data by JustWatch, via TMDb.
-      </p>
+      {phase === 'configure' && (
+        <>
+          <ConfigureStep
+            filmCount={films.length}
+            source={source}
+            region={region}
+            ownedServices={owned}
+            maxServices={maxServices}
+            running={running}
+            onToggleOwned={toggleOwned}
+            onRegionChange={setRegion}
+            onMaxServicesChange={setMaxServices}
+            onRun={run}
+          />
+          {error && (
+            <p role="alert" style={{ color: '#ff6b6b', fontSize: '0.9rem', margin: 0 }}>
+              {error}
+            </p>
+          )}
+        </>
+      )}
+
+      {phase === 'results' && result && (
+        <ResultsStep result={result} unresolvedCount={unresolved} onStartOver={startOver} />
+      )}
     </main>
   )
 }
