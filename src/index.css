@@ -38,13 +38,6 @@
   --font-body: 'DM Sans', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
 
-  /* Back-compat aliases for components restyled in later redesign phases. */
-  --surface-raised: var(--raised);
-  --border: var(--border-12);
-  --accent: var(--lime);
-  --accent-2: var(--amber);
-  --good: var(--lime);
-
   color-scheme: dark;
 }
 

@@ -212,13 +212,13 @@ export default function App() {
             {running ? 'Crunching your watchlist…' : 'Find my cheapest combo →'}
           </button>
           {progress && (
-            <div style={{ width: '100%', maxWidth: 640 }} role="status" aria-live="polite">
-              <div style={{ height: 8, borderRadius: 999, background: 'var(--surface-raised)', overflow: 'hidden' }}>
+            <div style={{ width: '100%' }} role="status" aria-live="polite">
+              <div style={{ height: 8, borderRadius: 999, background: 'var(--raised)', overflow: 'hidden' }}>
                 <div
                   style={{
                     height: '100%',
                     width: `${progress.pct}%`,
-                    background: 'var(--accent)',
+                    background: 'var(--lime)',
                     borderRadius: 999,
                     transition: 'width 0.3s ease',
                   }}

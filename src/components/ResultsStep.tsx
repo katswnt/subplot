@@ -1,3 +1,5 @@
+import { useRef, useState } from 'react'
+import { toPng } from 'html-to-image'
 import type { StreamingResult } from '@letterboxd-wrappd/domain/streaming'
 import {
   marginalSteps,
@@ -51,9 +53,9 @@ function Line({
     <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, ...mono, fontSize: 12.5, padding: '5px 0' }}>
       <span style={{ color: nameColor, fontWeight: 600 }}>{left}</span>
       {tag && <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>{tag}</span>}
-      <span style={{ flex: 1, borderBottom: `1px dotted ${leaderColor}`, transform: 'translateY(-3px)' }} />
-      {count && <span style={{ color: countColor }}>{count}</span>}
-      <span style={{ width: 64, textAlign: 'right', color: 'var(--text)' }}>{price}</span>
+      <span style={{ flex: 1, minWidth: 12, borderBottom: `1px dotted ${leaderColor}`, transform: 'translateY(-3px)' }} />
+      {count && <span style={{ color: countColor, whiteSpace: 'nowrap' }}>{count}</span>}
+      <span style={{ width: 64, textAlign: 'right', color: 'var(--text)', whiteSpace: 'nowrap' }}>{price}</span>
     </div>
   )
 }
@@ -82,9 +84,28 @@ export default function ResultsStep({
   const coveragePct = result.totalFilms ? Math.round((rec.coveredCount / result.totalFilms) * 100) : 0
   const period = new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' }).toUpperCase()
 
+  const receiptRef = useRef<HTMLDivElement>(null)
+  const [saving, setSaving] = useState(false)
+  const saveReceipt = async () => {
+    if (!receiptRef.current) return
+    setSaving(true)
+    try {
+      const url = await toPng(receiptRef.current, { pixelRatio: 2, backgroundColor: '#100f0b', cacheBust: true })
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'subplot-receipt.png'
+      a.click()
+    } catch {
+      /* saving is best-effort */
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%' }}>
       <div
+        ref={receiptRef}
         style={{
           background: 'var(--surface-receipt)',
           border: '1px solid var(--border-12)',
@@ -150,7 +171,7 @@ export default function ResultsStep({
         {owns && (
           <>
             <div style={perf} />
-            <div style={{ opacity: 0.62 }}>
+            <div style={{ opacity: 0.68 }}>
               <p style={groupLabel('var(--text-dimmer)')}>ALREADY PAYING · CREDITED</p>
               {result.owned.map((o) => {
                 const tier = ownedTierFor(region, o.slug, adPolicy, ownedTier[o.slug])
@@ -195,7 +216,7 @@ export default function ResultsStep({
         {moreSteps.length > 0 && (
           <>
             <div style={perf} />
-            <div style={{ opacity: 0.5 }}>
+            <div style={{ opacity: 0.6 }}>
               <p style={groupLabel('var(--text-dimmer)')}>IF YOU WANT MORE</p>
               <p style={{ fontSize: 11.5, color: 'var(--text-dim)', margin: '-6px 0 8px' }}>
                 Optional — each adds fewer films for more money.
@@ -252,6 +273,23 @@ export default function ResultsStep({
 
       {/* Actions */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <button
+          type="button"
+          onClick={saveReceipt}
+          disabled={saving}
+          style={{
+            background: 'transparent',
+            border: '1px solid rgba(255,179,0,0.4)',
+            borderRadius: 999,
+            padding: '8px 16px',
+            cursor: saving ? 'wait' : 'pointer',
+            color: 'var(--amber)',
+            fontSize: 13,
+            fontWeight: 600,
+          }}
+        >
+          {saving ? 'Saving…' : '⤓ Save receipt'}
+        </button>
         <button
           type="button"
           onClick={onStartOver}

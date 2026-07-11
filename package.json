@@ -15,7 +15,8 @@
     "@letterboxd-wrappd/domain": "*",
     "ioredis": "^5.9.2",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "html-to-image": "^1.11.13"
   },
   "devDependencies": {
     "@vercel/node": "^5.5.23",
