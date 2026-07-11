@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { ImportedFilm, ImportSource } from '@letterboxd-wrappd/domain/imports'
-import type { StreamingResult } from '@letterboxd-wrappd/domain/streaming'
+import { optimizeStreaming, type StreamingFilm } from '@letterboxd-wrappd/domain/streaming'
 import ImportStep from './components/ImportStep'
-import ConfigureStep from './components/ConfigureStep'
+import OptimizerControls, { type AdPolicy } from './components/OptimizerControls'
 import ResultsStep from './components/ResultsStep'
-import { runOptimization, type PipelineProgress } from './lib/pipeline'
+import { resolveWatchlist, type PipelineProgress } from './lib/pipeline'
 
 type Phase = 'import' | 'configure' | 'results'
 
@@ -21,17 +21,35 @@ export default function App() {
   const [phase, setPhase] = useState<Phase>('import')
   const [films, setFilms] = useState<ImportedFilm[]>([])
   const [source, setSource] = useState<ImportSource>('unknown')
+
+  // Optimizer controls (live-adjustable on the results screen).
   const [region, setRegion] = useState('US')
   const [owned, setOwned] = useState<string[]>([])
   const [includeLibraryFree, setIncludeLibraryFree] = useState(true)
-  const [adFreeOnly, setAdFreeOnly] = useState(false)
+  const [adPolicy, setAdPolicy] = useState<AdPolicy>('cheapest')
   const [budget, setBudget] = useState<number | null>(null)
   const [maxServices, setMaxServices] = useState<number | null>(null)
+
+  // Resolved films (the once-per-region network result). Optimization is pure,
+  // so we recompute the recommendation from these on every control change.
+  const [resolved, setResolved] = useState<StreamingFilm[] | null>(null)
+  const [unresolved, setUnresolved] = useState(0)
   const [running, setRunning] = useState(false)
   const [progress, setProgress] = useState<{ pct: number; label: string } | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [result, setResult] = useState<StreamingResult | null>(null)
-  const [unresolved, setUnresolved] = useState(0)
+
+  const result = useMemo(() => {
+    if (!resolved) return null
+    return optimizeStreaming(resolved, {
+      region,
+      ownedServices: owned,
+      maxServices: maxServices ?? undefined,
+      includeLibraryFree,
+      tierPolicy: adPolicy === 'cheapest' ? 'cheapest' : 'adfree',
+      excludeAdSupportedFree: adPolicy === 'noads',
+      maxBudget: budget ?? undefined,
+    })
+  }, [resolved, region, owned, maxServices, includeLibraryFree, adPolicy, budget])
 
   const handleImported = (src: ImportSource, imported: ImportedFilm[]) => {
     setSource(src)
@@ -42,29 +60,33 @@ export default function App() {
   const toggleOwned = (slug: string) =>
     setOwned((prev) => (prev.includes(slug) ? prev.filter((x) => x !== slug) : [...prev, slug]))
 
+  const controlProps = {
+    region,
+    ownedServices: owned,
+    includeLibraryFree,
+    adPolicy,
+    budget,
+    maxServices,
+    onToggleOwned: toggleOwned,
+    onToggleLibrary: () => setIncludeLibraryFree((v) => !v),
+    onAdPolicyChange: setAdPolicy,
+    onBudgetChange: setBudget,
+    onMaxServicesChange: setMaxServices,
+    onRegionChange: setRegion,
+  }
+
   const run = async () => {
     setRunning(true)
     setError(null)
     setProgress({ pct: 0, label: 'Reading your watchlist…' })
-    const outcome = await runOptimization(
-      films,
-      {
-        region,
-        ownedServices: owned,
-        maxServices: maxServices ?? undefined,
-        includeLibraryFree,
-        tierPolicy: adFreeOnly ? 'adfree' : 'cheapest',
-        maxBudget: budget ?? undefined,
-      },
-      (p) => setProgress(progressView(p)),
-    )
+    const outcome = await resolveWatchlist(films, region, (p) => setProgress(progressView(p)))
     setRunning(false)
     setProgress(null)
     if (!outcome.ok) {
       setError(outcome.error)
       return
     }
-    setResult(outcome.result)
+    setResolved(outcome.streamingFilms)
     setUnresolved(outcome.unresolvedCount)
     setPhase('results')
   }
@@ -72,7 +94,7 @@ export default function App() {
   const startOver = () => {
     setPhase('import')
     setFilms([])
-    setResult(null)
+    setResolved(null)
     setError(null)
     setOwned([])
   }
@@ -116,34 +138,30 @@ export default function App() {
 
       {phase === 'configure' && (
         <>
-          <ConfigureStep
-            filmCount={films.length}
-            source={source}
-            region={region}
-            ownedServices={owned}
-            maxServices={maxServices}
-            includeLibraryFree={includeLibraryFree}
-            adFreeOnly={adFreeOnly}
-            budget={budget}
-            running={running}
-            onToggleOwned={toggleOwned}
-            onToggleLibrary={() => setIncludeLibraryFree((v) => !v)}
-            onToggleAdFree={() => setAdFreeOnly((v) => !v)}
-            onBudgetChange={setBudget}
-            onRegionChange={setRegion}
-            onMaxServicesChange={setMaxServices}
-            onRun={run}
-          />
+          <p style={{ margin: 0, color: 'var(--text-muted)' }}>
+            Imported <strong style={{ color: 'var(--text)' }}>{films.length}</strong> films from {source}.
+          </p>
+          <OptimizerControls {...controlProps} showRegion />
+          <button
+            type="button"
+            onClick={run}
+            disabled={running}
+            style={{
+              background: running ? 'var(--surface-raised)' : 'var(--accent)',
+              color: running ? 'var(--text-muted)' : '#1a1205',
+              border: 'none',
+              borderRadius: 999,
+              padding: '0.75rem 1.5rem',
+              fontWeight: 700,
+              fontSize: '1rem',
+              cursor: running ? 'wait' : 'pointer',
+            }}
+          >
+            {running ? 'Crunching your watchlist…' : 'Find my cheapest combo'}
+          </button>
           {progress && (
             <div style={{ width: '100%', maxWidth: 640 }} role="status" aria-live="polite">
-              <div
-                style={{
-                  height: 8,
-                  borderRadius: 999,
-                  background: 'var(--surface-raised)',
-                  overflow: 'hidden',
-                }}
-              >
+              <div style={{ height: 8, borderRadius: 999, background: 'var(--surface-raised)', overflow: 'hidden' }}>
                 <div
                   style={{
                     height: '100%',
@@ -168,7 +186,13 @@ export default function App() {
       )}
 
       {phase === 'results' && result && (
-        <ResultsStep result={result} unresolvedCount={unresolved} onStartOver={startOver} />
+        <>
+          <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.9rem', textAlign: 'center' }}>
+            Tweak anything below — results update instantly, no re-upload.
+          </p>
+          <OptimizerControls {...controlProps} />
+          <ResultsStep result={result} unresolvedCount={unresolved} onStartOver={startOver} />
+        </>
       )}
     </main>
   )

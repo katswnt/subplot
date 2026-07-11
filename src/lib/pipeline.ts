@@ -5,25 +5,14 @@ import {
   type ResolveFilmInput,
   type FilmProviders,
 } from '@letterboxd-wrappd/api-client'
-import {
-  optimizeStreaming,
-  type StreamingFilm,
-  type StreamingResult,
-} from '@letterboxd-wrappd/domain/streaming'
+import type { StreamingFilm } from '@letterboxd-wrappd/domain/streaming'
 import type { ImportedFilm } from '@letterboxd-wrappd/domain/imports'
 
-export type OptimizeConfig = {
-  region: string
-  /** Canonical service slugs the user already pays for. */
-  ownedServices: string[]
-  maxServices?: number
-  includeLibraryFree?: boolean
-  tierPolicy?: 'cheapest' | 'adfree'
-  maxBudget?: number
-}
-
-export type PipelineOutcome =
-  | { ok: true; result: StreamingResult; unresolvedCount: number }
+// The result of the (expensive, once-per-region) network stage. Once we hold
+// these, optimizeStreaming is pure + instant, so the results screen can re-run
+// it live on every control change with no further network calls.
+export type ResolveOutcome =
+  | { ok: true; streamingFilms: StreamingFilm[]; unresolvedCount: number }
   | { ok: false; error: string }
 
 export type PipelineProgress = {
@@ -72,16 +61,16 @@ async function mapLimit<T, R>(
 }
 
 /**
- * The full compute path: resolve imported films to TMDb ids, fetch their
- * subscription availability, then run the cheapest-combo optimizer. Both
- * network stages are chunked so watchlists of any size work.
- * Films that don't resolve or have no provider data become orphans downstream.
+ * The network stage: resolve imported films to TMDb ids and fetch their watch
+ * availability (region-scoped), producing the raw provider-id map each film can
+ * be watched through. Both sub-stages are chunked so watchlists of any size work.
+ * Optimization (which combo to recommend) happens separately + purely downstream.
  */
-export async function runOptimization(
+export async function resolveWatchlist(
   films: ImportedFilm[],
-  config: OptimizeConfig,
+  region: string,
   onProgress?: ProgressFn,
-): Promise<PipelineOutcome> {
+): Promise<ResolveOutcome> {
   const cfg = apiConfig()
 
   const resolveInput: ResolveFilmInput[] = films.map((f) => ({
@@ -118,7 +107,7 @@ export async function runOptimization(
     onProgress?.({ stage: 'availability', completed: 0, total: wpBatches.length })
     let wpDone = 0
     const wpChunks = await mapLimit(wpBatches, CHUNK_CONCURRENCY, async (batch) => {
-      const w = await getWatchProviders(cfg, batch, config.region)
+      const w = await getWatchProviders(cfg, batch, region)
       onProgress?.({ stage: 'availability', completed: ++wpDone, total: wpBatches.length })
       return w
     })
@@ -141,14 +130,5 @@ export async function runOptimization(
     return { key: f.key, title: f.title, providerIds }
   })
 
-  const result = optimizeStreaming(streamingFilms, {
-    region: config.region,
-    ownedServices: config.ownedServices,
-    maxServices: config.maxServices,
-    includeLibraryFree: config.includeLibraryFree,
-    tierPolicy: config.tierPolicy,
-    maxBudget: config.maxBudget,
-  })
-
-  return { ok: true, result, unresolvedCount }
+  return { ok: true, streamingFilms, unresolvedCount }
 }

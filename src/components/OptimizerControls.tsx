@@ -1,23 +1,23 @@
 import { SERVICES, serviceMonthly } from '@letterboxd-wrappd/domain/streaming'
 import { formatMoney } from '../lib/explain'
 
+export type AdPolicy = 'cheapest' | 'adfree' | 'noads'
+
 type Props = {
-  filmCount: number
-  source: string
   region: string
   ownedServices: string[]
-  maxServices: number | null
   includeLibraryFree: boolean
-  adFreeOnly: boolean
+  adPolicy: AdPolicy
   budget: number | null
-  running: boolean
+  maxServices: number | null
+  /** Region changes require a re-fetch, so it only appears pre-run. */
+  showRegion?: boolean
   onToggleOwned: (slug: string) => void
   onToggleLibrary: () => void
-  onToggleAdFree: () => void
-  onBudgetChange: (budget: number | null) => void
-  onRegionChange: (region: string) => void
-  onMaxServicesChange: (max: number | null) => void
-  onRun: () => void
+  onAdPolicyChange: (p: AdPolicy) => void
+  onBudgetChange: (b: number | null) => void
+  onMaxServicesChange: (m: number | null) => void
+  onRegionChange: (r: string) => void
 }
 
 const REGIONS = Object.keys(SERVICES)
@@ -27,6 +27,11 @@ const MAX_OPTIONS: Array<{ label: string; value: number | null }> = [
   { label: '2', value: 2 },
   { label: '3', value: 3 },
 ]
+const AD_OPTIONS: Array<{ label: string; value: AdPolicy }> = [
+  { label: 'Cheapest', value: 'cheapest' },
+  { label: 'Ad-free pricing', value: 'adfree' },
+  { label: 'No ads at all', value: 'noads' },
+]
 
 const card: React.CSSProperties = {
   background: 'var(--surface-card)',
@@ -35,48 +40,43 @@ const card: React.CSSProperties = {
   padding: '1.1rem 1.25rem',
 }
 
-const chip = (active: boolean, disabled = false): React.CSSProperties => ({
+const chip = (active: boolean): React.CSSProperties => ({
   background: active ? 'var(--accent)' : 'var(--surface-raised)',
-  color: active ? '#1a1205' : disabled ? 'var(--text-muted)' : 'var(--text)',
+  color: active ? '#1a1205' : 'var(--text)',
   border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
   borderRadius: 999,
   padding: '0.3rem 0.75rem',
   fontSize: '0.85rem',
-  cursor: disabled ? 'not-allowed' : 'pointer',
-  opacity: disabled ? 0.5 : 1,
+  cursor: 'pointer',
   fontWeight: active ? 700 : 400,
 })
 
-export default function ConfigureStep({
-  filmCount,
-  source,
+const adPolicyHint: Record<AdPolicy, string> = {
+  cheapest: 'Cheapest tier per service (may include ads). Free ad-supported services count.',
+  adfree: 'Charge each paid service’s ad-free tier. Free ad-supported services still count.',
+  noads: 'Ad-free paid tiers AND drop free ad-supported services (Tubi, Pluto…) — nothing with ads.',
+}
+
+export default function OptimizerControls({
   region,
   ownedServices,
-  maxServices,
   includeLibraryFree,
-  adFreeOnly,
+  adPolicy,
   budget,
-  running,
+  maxServices,
+  showRegion = false,
   onToggleOwned,
   onToggleLibrary,
-  onToggleAdFree,
+  onAdPolicyChange,
   onBudgetChange,
-  onRegionChange,
   onMaxServicesChange,
-  onRun,
+  onRegionChange,
 }: Props) {
-  // Only paid subscriptions are "services you pay for"; free ones are handled
-  // automatically and surfaced in the results.
   const paidServices = (SERVICES[region] ?? []).filter((s) => s.kind === 'paid')
 
   return (
-    <section style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%', maxWidth: 640 }}>
-      <p style={{ margin: 0, color: 'var(--text-muted)' }}>
-        Imported <strong style={{ color: 'var(--text)' }}>{filmCount}</strong> films from {source}.
-      </p>
-
-      {/* Region picker only appears once more than one region is priced. */}
-      {REGIONS.length > 1 && (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%', maxWidth: 640 }}>
+      {showRegion && REGIONS.length > 1 && (
         <div style={card}>
           <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }} htmlFor="region">
             Region
@@ -136,25 +136,28 @@ export default function ConfigureStep({
           {includeLibraryFree ? '✓ ' : ''}I have a library card (Kanopy &amp; Hoopla)
         </button>
         <p style={{ margin: '0.5rem 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-          Free with a library card. Free ad-supported services (Tubi, Pluto&hellip;) are always counted.
+          Free with a library card.
         </p>
       </div>
 
       <div style={card}>
-        <p style={{ margin: '0 0 0.6rem', fontSize: '0.9rem' }}>Max services to add</p>
-        <div style={{ display: 'flex', gap: '0.4rem' }}>
-          {MAX_OPTIONS.map((o) => (
+        <p style={{ margin: '0 0 0.6rem', fontSize: '0.9rem' }}>Ads</p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+          {AD_OPTIONS.map((o) => (
             <button
-              key={o.label}
+              key={o.value}
               type="button"
-              aria-pressed={maxServices === o.value}
-              onClick={() => onMaxServicesChange(o.value)}
-              style={chip(maxServices === o.value)}
+              aria-pressed={adPolicy === o.value}
+              onClick={() => onAdPolicyChange(o.value)}
+              style={chip(adPolicy === o.value)}
             >
               {o.label}
             </button>
           ))}
         </div>
+        <p style={{ margin: '0.5rem 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+          {adPolicyHint[adPolicy]}
+        </p>
       </div>
 
       <div style={card}>
@@ -192,51 +195,21 @@ export default function ConfigureStep({
       </div>
 
       <div style={card}>
-        <button
-          type="button"
-          aria-pressed={adFreeOnly}
-          onClick={onToggleAdFree}
-          style={{ ...chip(adFreeOnly), padding: '0.4rem 0.9rem' }}
-        >
-          {adFreeOnly ? '✓ ' : ''}Ad-free pricing only
-        </button>
-        <p style={{ margin: '0.5rem 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-          Price each service&rsquo;s ad-free tier (and drop always-ads services like Tubi &amp; Pluto). Off = the
-          cheapest tier, which may include ads.
-        </p>
-      </div>
-
-      <div style={{ ...card, opacity: 0.75 }}>
-        <p style={{ margin: '0 0 0.5rem', fontSize: '0.9rem' }}>
-          Quality &amp; audio <span style={{ color: 'var(--accent-2)', fontSize: '0.75rem' }}>· coming soon</span>
-        </p>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-          {['4K', 'HDR', 'Original audio', '5.1 / Atmos'].map((t) => (
-            <span key={t} aria-disabled style={chip(false, true)}>
-              {t}
-            </span>
+        <p style={{ margin: '0 0 0.6rem', fontSize: '0.9rem' }}>Max services to add</p>
+        <div style={{ display: 'flex', gap: '0.4rem' }}>
+          {MAX_OPTIONS.map((o) => (
+            <button
+              key={o.label}
+              type="button"
+              aria-pressed={maxServices === o.value}
+              onClick={() => onMaxServicesChange(o.value)}
+              style={chip(maxServices === o.value)}
+            >
+              {o.label}
+            </button>
           ))}
         </div>
       </div>
-
-      <button
-        type="button"
-        onClick={onRun}
-        disabled={running}
-        style={{
-          background: running ? 'var(--surface-raised)' : 'var(--accent)',
-          color: running ? 'var(--text-muted)' : '#1a1205',
-          border: 'none',
-          borderRadius: 999,
-          padding: '0.75rem 1.5rem',
-          fontWeight: 700,
-          fontSize: '1rem',
-          cursor: running ? 'wait' : 'pointer',
-          alignSelf: 'flex-start',
-        }}
-      >
-        {running ? 'Crunching your watchlist…' : 'Find my cheapest combo'}
-      </button>
-    </section>
+    </div>
   )
 }
