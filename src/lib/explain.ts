@@ -2,8 +2,29 @@ import { serviceBySlug, type StreamingResult } from '@letterboxd-wrappd/domain/s
 
 /** Pure formatters that turn an optimizer result into human-readable copy. */
 
+export type AdPolicy = 'cheapest' | 'adfree' | 'noads'
+
 export const serviceLabel = (region: string, slug: string): string =>
   serviceBySlug[region]?.[slug]?.name ?? slug
+
+/** Savings of the recommended combo vs subscribing to every covering service. */
+export const savingsVsAllIn = (result: StreamingResult): number =>
+  Math.max(0, Math.round((result.allInCost - result.recommended.monthlyCost) * 100) / 100)
+
+/** The tier label a service is priced at under the active policy (e.g. "Ad-Free"). */
+export function tierTag(region: string, slug: string, policy: AdPolicy): string {
+  const svc = serviceBySlug[region]?.[slug]
+  if (!svc) return ''
+  const tier =
+    policy === 'cheapest'
+      ? [...svc.tiers].sort((a, b) => a.monthly - b.monthly)[0]
+      : (svc.tiers.find((t) => !t.ads) ?? svc.tiers[0])
+  return tier?.label ?? ''
+}
+
+/** Short badge for the active quality preference. */
+export const preferenceBadge = (policy: AdPolicy): string =>
+  policy === 'noads' ? 'No ads anywhere' : policy === 'adfree' ? 'Ad-free' : 'Cheapest'
 
 export const formatMoney = (n: number): string => `$${n.toFixed(2)}`
 
