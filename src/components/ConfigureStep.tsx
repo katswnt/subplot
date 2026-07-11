@@ -9,10 +9,12 @@ type Props = {
   maxServices: number | null
   includeLibraryFree: boolean
   adFreeOnly: boolean
+  budget: number | null
   running: boolean
   onToggleOwned: (slug: string) => void
   onToggleLibrary: () => void
   onToggleAdFree: () => void
+  onBudgetChange: (budget: number | null) => void
   onRegionChange: (region: string) => void
   onMaxServicesChange: (max: number | null) => void
   onRun: () => void
@@ -53,10 +55,12 @@ export default function ConfigureStep({
   maxServices,
   includeLibraryFree,
   adFreeOnly,
+  budget,
   running,
   onToggleOwned,
   onToggleLibrary,
   onToggleAdFree,
+  onBudgetChange,
   onRegionChange,
   onMaxServicesChange,
   onRun,
@@ -151,6 +155,40 @@ export default function ConfigureStep({
             </button>
           ))}
         </div>
+      </div>
+
+      <div style={card}>
+        <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '0.9rem' }} htmlFor="budget">
+          Monthly budget <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span>
+        </label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <span style={{ color: 'var(--text-muted)' }}>$</span>
+          <input
+            id="budget"
+            type="number"
+            min={0}
+            step={1}
+            inputMode="decimal"
+            placeholder="no limit"
+            value={budget ?? ''}
+            onChange={(e) => {
+              const v = e.target.value.trim()
+              onBudgetChange(v === '' ? null : Math.max(0, Number(v)))
+            }}
+            style={{
+              width: 120,
+              background: 'var(--surface-raised)',
+              color: 'var(--text)',
+              border: '1px solid var(--border)',
+              borderRadius: 10,
+              padding: '0.5rem 0.75rem',
+              fontSize: '0.9rem',
+            }}
+          />
+        </div>
+        <p style={{ margin: '0.5rem 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+          Set a cap and we&rsquo;ll fit the most films into it. Leave blank for the best-value pick.
+        </p>
       </div>
 
       <div style={card}>

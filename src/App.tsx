@@ -25,6 +25,7 @@ export default function App() {
   const [owned, setOwned] = useState<string[]>([])
   const [includeLibraryFree, setIncludeLibraryFree] = useState(true)
   const [adFreeOnly, setAdFreeOnly] = useState(false)
+  const [budget, setBudget] = useState<number | null>(null)
   const [maxServices, setMaxServices] = useState<number | null>(null)
   const [running, setRunning] = useState(false)
   const [progress, setProgress] = useState<{ pct: number; label: string } | null>(null)
@@ -53,6 +54,7 @@ export default function App() {
         maxServices: maxServices ?? undefined,
         includeLibraryFree,
         tierPolicy: adFreeOnly ? 'adfree' : 'cheapest',
+        maxBudget: budget ?? undefined,
       },
       (p) => setProgress(progressView(p)),
     )
@@ -122,10 +124,12 @@ export default function App() {
             maxServices={maxServices}
             includeLibraryFree={includeLibraryFree}
             adFreeOnly={adFreeOnly}
+            budget={budget}
             running={running}
             onToggleOwned={toggleOwned}
             onToggleLibrary={() => setIncludeLibraryFree((v) => !v)}
             onToggleAdFree={() => setAdFreeOnly((v) => !v)}
+            onBudgetChange={setBudget}
             onRegionChange={setRegion}
             onMaxServicesChange={setMaxServices}
             onRun={run}

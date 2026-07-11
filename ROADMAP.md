@@ -6,26 +6,7 @@ data + a maintained US `SUBSCRIPTION_PRICES` table. Optimizer is a greedy
 marginal path (each service unlocks the most new films; overlap counted once)
 with a recommended "knee," plus orphans (films on no tracked subscription).
 
-## V2
-
-- **Tier filter — ad-free vs ad-supported (and HD/4K).** Today `SUBSCRIPTION_PRICES`
-  holds one price per service (the standard, usually ad-supported tier). Some
-  users only want no-ads pricing. Model each service as multiple tiers
-  `{ label, monthly, ads, maxQuality }` and let the user filter which tiers are
-  eligible; the optimizer runs over the selected tier per service.
-- **More services, including free ones.** We're missing a lot — notably the free
-  / library-backed tiers: **Kanopy** and **Hoopla** ($0 with a library card),
-  **Tubi**, **Pluto TV**, **Peacock free**, etc. Free services are always worth
-  adding (cost 0), so they should be surfaced as "you can already watch N of
-  these for free" and folded into coverage before any paid combo. Also expand
-  paid coverage (Fubo, Philo, regional services) and add non-US regions (which
-  then un-hides the region selector).
-- **Budget mode.** Instead of a $/film knee, let the user say **"my streaming
-  budget is $X/mo"** or **"I can add $20 to my budget"** and maximize coverage
-  within that ceiling (a budget-constrained set cover — the dual of the current
-  knee). Pairs naturally with owned-services (the remaining budget).
-
-## V3
+## V3 (next)
 
 - **Rent break-even.** *"How many movies do I have to watch on this service to
   make it cheaper than renting them individually?"* Given a service's monthly
@@ -34,9 +15,27 @@ with a recommended "knee," plus orphans (films on no tracked subscription).
   itself if you watch ≥3 of your list a month vs renting"). Needs per-film
   rent/buy prices — the **Streaming Availability API** (also unlocks the disabled
   4K/audio toggles). The API's response types already leave room for `rent`/`buy`.
+- **More coverage & regions.** Add remaining niche subscriptions (Fubo, Philo,
+  Cineverse, Screambox…) so fewer films are orphaned, and non-US regions (which
+  un-hides the region selector).
+- **HD/4K + audio filter.** Real per-offer quality/audio (Streaming Availability
+  API) to power the "coming soon" 4K/HDR/Atmos chips.
 
 ## Done
 
+### V2 — canonical catalog, free services, tier filter, budget mode
+- **Canonical service catalog** (`streaming/catalog.ts`): folds every TMDb
+  provider-id variant (pricing tiers + resold channels) into one slug, fixing a
+  coverage-undercount bug (e.g. "Paramount Plus Premium" 2303 was orphaning).
+- **Free services** — Kanopy/Hoopla (library card) + Tubi/Pluto/Freevee/Roku/Plex
+  (ads), surfaced in a separate "Free" section; the endpoint now reads TMDb's
+  `free`/`ads` buckets, not just `flatrate`. Library-card toggle gates Kanopy/Hoopla.
+- **Ad-free tier filter** — "Ad-free pricing only" prices each service's ad-free
+  tier and drops always-ads services.
+- **Budget mode** — "Monthly budget $X" picks the richest affordable combo from
+  the exact Pareto frontier (not a greedy prefix).
+
+### Earlier
 - Progress indicator — determinate two-phase bar (matching → availability),
   driven by real batch completion, so large watchlists (1,500+ films) never look
   frozen during the ~30–60s first run.
