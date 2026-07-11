@@ -24,7 +24,25 @@ export default function ImportStep({ onImported }: Props) {
   }
 
   return (
-    <section style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%', maxWidth: 560 }}>
+    <section style={{ display: 'flex', flexDirection: 'column', gap: '22px', width: '100%' }}>
+      <div>
+        <h1
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontWeight: 600,
+            fontSize: 33,
+            lineHeight: 1.05,
+            letterSpacing: '-0.02em',
+            margin: '0 0 12px',
+          }}
+        >
+          The cheapest way to watch your watchlist.
+        </h1>
+        <p style={{ fontSize: 15, lineHeight: 1.55, color: 'var(--text-muted)', margin: 0 }}>
+          Drop your export. Subplot prices every film against the services you can actually subscribe to,
+          then finds the lowest-cost combination that covers the most of it.
+        </p>
+      </div>
       <div
         onDragOver={(e) => {
           e.preventDefault()

@@ -100,44 +100,54 @@ export default function App() {
   }
 
   return (
-    <main
+    <div
       style={{
         minHeight: '100dvh',
         display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: '2rem',
-        padding: '3rem 1.25rem 4rem',
+        justifyContent: 'center',
+        background: 'radial-gradient(900px 520px at 50% -8%, #1a1810 0%, #0c0b08 62%)',
       }}
     >
-      <header style={{ textAlign: 'center', maxWidth: 640 }}>
-        <p
+      <div style={{ width: '100%', maxWidth: 472, padding: '40px 22px 90px' }}>
+        {/* Persistent brand bar */}
+        <div
           style={{
-            color: 'var(--accent)',
-            fontWeight: 700,
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-            fontSize: '0.8rem',
-            margin: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: 30,
           }}
         >
-          Subplot
-        </p>
-        <h1 style={{ fontSize: '2rem', lineHeight: 1.1, margin: '0.4rem 0 0.5rem' }}>
-          The cheapest way to watch your watchlist
-        </h1>
-        {phase === 'import' && (
-          <p style={{ color: 'var(--text-muted)', margin: 0 }}>
-            Import your Letterboxd or IMDb watchlist and we&rsquo;ll find the lowest-cost combination of
-            streaming subscriptions that covers the most of it.
-          </p>
-        )}
-      </header>
+          <span
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontWeight: 700,
+              fontSize: 16,
+              letterSpacing: '0.04em',
+            }}
+          >
+            <span style={{ color: 'var(--lime)' }}>◐</span> SUBPLOT
+          </span>
+          <span
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 10,
+              letterSpacing: '0.16em',
+              color: 'var(--amber)',
+              border: '1px solid rgba(255,179,0,0.4)',
+              borderRadius: 999,
+              padding: '3px 9px',
+            }}
+          >
+            BETA
+          </span>
+        </div>
 
-      {phase === 'import' && <ImportStep onImported={handleImported} />}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: phase === 'import' ? 22 : 16 }}>
+          {phase === 'import' && <ImportStep onImported={handleImported} />}
 
-      {phase === 'configure' && (
-        <>
+          {phase === 'configure' && (
+            <>
           <p style={{ margin: 0, color: 'var(--text-muted)' }}>
             Imported <strong style={{ color: 'var(--text)' }}>{films.length}</strong> films from {source}.
           </p>
@@ -194,6 +204,8 @@ export default function App() {
           <ResultsStep result={result} unresolvedCount={unresolved} onStartOver={startOver} />
         </>
       )}
-    </main>
+        </div>
+      </div>
+    </div>
   )
 }
