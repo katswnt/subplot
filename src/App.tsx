@@ -29,6 +29,9 @@ export default function App() {
   const [adPolicy, setAdPolicy] = useState<AdPolicy>('cheapest')
   const [budget, setBudget] = useState<number | null>(null)
   const [maxServices, setMaxServices] = useState<number | null>(null)
+  // Manual tier overrides for owned services (display-only: which tier you pay).
+  const [ownedTier, setOwnedTier] = useState<Record<string, string>>({})
+  const [editingTier, setEditingTier] = useState<string | null>(null)
 
   // Resolved films (the once-per-region network result). Optimization is pure,
   // so we recompute the recommendation from these on every control change.
@@ -58,7 +61,19 @@ export default function App() {
   }
 
   const toggleOwned = (slug: string) =>
-    setOwned((prev) => (prev.includes(slug) ? prev.filter((x) => x !== slug) : [...prev, slug]))
+    setOwned((prev) => {
+      if (prev.includes(slug)) {
+        // De-selecting clears its tier override + closes the picker.
+        setOwnedTier((prevTiers) => {
+          const next = { ...prevTiers }
+          delete next[slug]
+          return next
+        })
+        setEditingTier((e) => (e === slug ? null : e))
+        return prev.filter((x) => x !== slug)
+      }
+      return [...prev, slug]
+    })
 
   const controlProps = {
     region,
@@ -67,12 +82,19 @@ export default function App() {
     adPolicy,
     budget,
     maxServices,
+    ownedTier,
+    editingTier,
     onToggleOwned: toggleOwned,
     onToggleLibrary: () => setIncludeLibraryFree((v) => !v),
     onAdPolicyChange: setAdPolicy,
     onBudgetChange: setBudget,
     onMaxServicesChange: setMaxServices,
     onRegionChange: setRegion,
+    onEditTier: (slug: string | null) => setEditingTier((e) => (e === slug ? null : slug)),
+    onSetTier: (slug: string, tierId: string) => {
+      setOwnedTier((prev) => ({ ...prev, [slug]: tierId }))
+      setEditingTier(null)
+    },
   }
 
   const run = async () => {
@@ -97,6 +119,8 @@ export default function App() {
     setResolved(null)
     setError(null)
     setOwned([])
+    setOwnedTier({})
+    setEditingTier(null)
   }
 
   return (
@@ -148,8 +172,25 @@ export default function App() {
 
           {phase === 'configure' && (
             <>
-          <p style={{ margin: 0, color: 'var(--text-muted)' }}>
-            Imported <strong style={{ color: 'var(--text)' }}>{films.length}</strong> films from {source}.
+          <p style={{ margin: 0, fontSize: 13.5, color: 'var(--text-muted)' }}>
+            Imported <strong style={{ color: 'var(--text)' }}>{films.length}</strong> films from{' '}
+            {source === 'imdb' ? 'IMDb' : 'Letterboxd'}.{' '}
+            <button
+              type="button"
+              onClick={startOver}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                cursor: 'pointer',
+                color: 'var(--amber)',
+                fontSize: 13.5,
+                textDecoration: 'underline',
+                textDecorationStyle: 'dotted',
+              }}
+            >
+              change
+            </button>
           </p>
           <OptimizerControls {...controlProps} showRegion />
           <button
@@ -157,17 +198,18 @@ export default function App() {
             onClick={run}
             disabled={running}
             style={{
-              background: running ? 'var(--surface-raised)' : 'var(--accent)',
-              color: running ? 'var(--text-muted)' : '#1a1205',
+              background: running ? 'var(--raised)' : 'var(--lime)',
+              color: running ? 'var(--text-muted)' : 'var(--on-lime)',
               border: 'none',
               borderRadius: 999,
-              padding: '0.75rem 1.5rem',
+              padding: '14px 24px',
+              fontFamily: 'var(--font-body)',
               fontWeight: 700,
-              fontSize: '1rem',
+              fontSize: 15.5,
               cursor: running ? 'wait' : 'pointer',
             }}
           >
-            {running ? 'Crunching your watchlist…' : 'Find my cheapest combo'}
+            {running ? 'Crunching your watchlist…' : 'Find my cheapest combo →'}
           </button>
           {progress && (
             <div style={{ width: '100%', maxWidth: 640 }} role="status" aria-live="polite">
