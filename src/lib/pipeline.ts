@@ -6,10 +6,10 @@ import {
 } from '@letterboxd-wrappd/api-client'
 import {
   optimizeStreaming,
-  type ImportedFilm,
   type StreamingFilm,
   type StreamingResult,
-} from '@letterboxd-wrappd/domain'
+} from '@letterboxd-wrappd/domain/streaming'
+import type { ImportedFilm } from '@letterboxd-wrappd/domain/imports'
 
 export type OptimizeConfig = {
   region: string

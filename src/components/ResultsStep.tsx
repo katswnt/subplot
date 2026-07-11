@@ -1,4 +1,4 @@
-import type { StreamingResult } from '@letterboxd-wrappd/domain'
+import type { StreamingResult } from '@letterboxd-wrappd/domain/streaming'
 import { describeRecommended, marginalSteps, formatMoney, serviceLabel } from '../lib/explain'
 
 type Props = {

@@ -1,4 +1,4 @@
-import { SUBSCRIPTION_PRICES, type StreamingResult, type Combo } from '@letterboxd-wrappd/domain'
+import { SUBSCRIPTION_PRICES, type StreamingResult, type Combo } from '@letterboxd-wrappd/domain/streaming'
 
 /** Pure formatters that turn an optimizer result into human-readable copy. */
 

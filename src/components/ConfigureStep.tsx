@@ -1,4 +1,4 @@
-import { SUBSCRIPTION_PRICES } from '@letterboxd-wrappd/domain'
+import { SUBSCRIPTION_PRICES } from '@letterboxd-wrappd/domain/streaming'
 import { formatMoney } from '../lib/explain'
 
 type Props = {

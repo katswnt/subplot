@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import type { ImportedFilm, ImportSource, StreamingResult } from '@letterboxd-wrappd/domain'
+import type { ImportedFilm, ImportSource } from '@letterboxd-wrappd/domain/imports'
+import type { StreamingResult } from '@letterboxd-wrappd/domain/streaming'
 import ImportStep from './components/ImportStep'
 import ConfigureStep from './components/ConfigureStep'
 import ResultsStep from './components/ResultsStep'
