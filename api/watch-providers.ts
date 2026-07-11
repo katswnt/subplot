@@ -8,8 +8,9 @@ import { mapPool } from './_lib/pool.js';
  * Subplot — per-film streaming availability from TMDb watch/providers.
  *
  * Provider data is universal (region-scoped, not per-user) → Redis-cached per
- * (region, tmdbId) for a strong cross-user hit rate. MVP consumes `flatrate`
- * (subscription) for the optimizer; `rent`/`buy` are carried through for V2.
+ * (region, tmdbId) for a strong cross-user hit rate. We surface every watch
+ * bucket TMDb exposes: `flatrate` (subscription), `free` (no-cost, e.g. Kanopy/
+ * Hoopla), `ads` (free-with-ads, e.g. Tubi/Pluto), and `rent`/`buy` (V2 pricing).
  *
  * Data by JustWatch, surfaced via TMDb — attribute JustWatch in the UI.
  */
@@ -18,10 +19,24 @@ const TMDB = 'https://api.themoviedb.org/3';
 const MAX_IDS = 600;
 
 type WatchProvider = { providerId: number; name: string; logoPath?: string };
-type FilmProviders = { flatrate: WatchProvider[]; rent: WatchProvider[]; buy: WatchProvider[]; link?: string };
+type FilmProviders = {
+  flatrate: WatchProvider[];
+  free: WatchProvider[];
+  ads: WatchProvider[];
+  rent: WatchProvider[];
+  buy: WatchProvider[];
+  link?: string;
+};
 
 type TmdbOffer = { provider_id?: number; provider_name?: string; logo_path?: string };
-type TmdbRegion = { link?: string; flatrate?: TmdbOffer[]; rent?: TmdbOffer[]; buy?: TmdbOffer[] };
+type TmdbRegion = {
+  link?: string;
+  flatrate?: TmdbOffer[];
+  free?: TmdbOffer[];
+  ads?: TmdbOffer[];
+  rent?: TmdbOffer[];
+  buy?: TmdbOffer[];
+};
 
 const mapOffers = (offers?: TmdbOffer[]): WatchProvider[] =>
   (offers ?? [])
@@ -44,6 +59,8 @@ async function fetchProviders(id: number, region: string, apiKey: string): Promi
   const regionData = data.results?.[region];
   const providers: FilmProviders = {
     flatrate: mapOffers(regionData?.flatrate),
+    free: mapOffers(regionData?.free),
+    ads: mapOffers(regionData?.ads),
     rent: mapOffers(regionData?.rent),
     buy: mapOffers(regionData?.buy),
     link: regionData?.link,

@@ -80,7 +80,7 @@ export async function setCached(key: string, value: unknown, expiresInSeconds?: 
 export const CACHE_KEYS = {
   RESOLVE_IMDB: 'subplot:resolve:v1:imdb:',
   RESOLVE_SEARCH: 'subplot:resolve:v1:search:',
-  WATCH_PROVIDERS: 'subplot:wp:v1:',
+  WATCH_PROVIDERS: 'subplot:wp:v2:', // v2: include free + ads buckets
 } as const;
 
 export const CACHE_DURATION = {
