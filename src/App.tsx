@@ -4,9 +4,18 @@ import type { StreamingResult } from '@letterboxd-wrappd/domain/streaming'
 import ImportStep from './components/ImportStep'
 import ConfigureStep from './components/ConfigureStep'
 import ResultsStep from './components/ResultsStep'
-import { runOptimization } from './lib/pipeline'
+import { runOptimization, type PipelineProgress } from './lib/pipeline'
 
 type Phase = 'import' | 'configure' | 'results'
+
+// The two network stages split the bar in half each; labels stay human.
+function progressView(p: PipelineProgress): { pct: number; label: string } {
+  const frac = p.total > 0 ? p.completed / p.total : 0
+  if (p.stage === 'resolving') {
+    return { pct: Math.round(frac * 50), label: 'Matching your films to the movie database…' }
+  }
+  return { pct: 50 + Math.round(frac * 50), label: 'Checking where each film streams…' }
+}
 
 export default function App() {
   const [phase, setPhase] = useState<Phase>('import')
@@ -16,6 +25,7 @@ export default function App() {
   const [owned, setOwned] = useState<number[]>([])
   const [maxServices, setMaxServices] = useState<number | null>(null)
   const [running, setRunning] = useState(false)
+  const [progress, setProgress] = useState<{ pct: number; label: string } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<StreamingResult | null>(null)
   const [unresolved, setUnresolved] = useState(0)
@@ -32,12 +42,14 @@ export default function App() {
   const run = async () => {
     setRunning(true)
     setError(null)
-    const outcome = await runOptimization(films, {
-      region,
-      ownedServices: owned,
-      maxServices: maxServices ?? undefined,
-    })
+    setProgress({ pct: 0, label: 'Reading your watchlist…' })
+    const outcome = await runOptimization(
+      films,
+      { region, ownedServices: owned, maxServices: maxServices ?? undefined },
+      (p) => setProgress(progressView(p)),
+    )
     setRunning(false)
+    setProgress(null)
     if (!outcome.ok) {
       setError(outcome.error)
       return
@@ -106,6 +118,31 @@ export default function App() {
             onMaxServicesChange={setMaxServices}
             onRun={run}
           />
+          {progress && (
+            <div style={{ width: '100%', maxWidth: 640 }} role="status" aria-live="polite">
+              <div
+                style={{
+                  height: 8,
+                  borderRadius: 999,
+                  background: 'var(--surface-raised)',
+                  overflow: 'hidden',
+                }}
+              >
+                <div
+                  style={{
+                    height: '100%',
+                    width: `${progress.pct}%`,
+                    background: 'var(--accent)',
+                    borderRadius: 999,
+                    transition: 'width 0.3s ease',
+                  }}
+                />
+              </div>
+              <p style={{ margin: '0.5rem 0 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                {progress.label} {progress.pct}%
+              </p>
+            </div>
+          )}
           {error && (
             <p role="alert" style={{ color: '#ff6b6b', fontSize: '0.9rem', margin: 0 }}>
               {error}

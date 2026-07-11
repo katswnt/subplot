@@ -22,6 +22,16 @@ export type PipelineOutcome =
   | { ok: true; result: StreamingResult; unresolvedCount: number }
   | { ok: false; error: string }
 
+export type PipelineProgress = {
+  stage: 'resolving' | 'availability'
+  /** Batches finished in this stage. */
+  completed: number
+  /** Total batches in this stage. */
+  total: number
+}
+
+export type ProgressFn = (p: PipelineProgress) => void
+
 const apiConfig = (): ApiClientConfig => ({
   baseUrl: typeof window !== 'undefined' ? window.location.origin : '',
 })
@@ -66,6 +76,7 @@ async function mapLimit<T, R>(
 export async function runOptimization(
   films: ImportedFilm[],
   config: OptimizeConfig,
+  onProgress?: ProgressFn,
 ): Promise<PipelineOutcome> {
   const cfg = apiConfig()
 
@@ -79,9 +90,14 @@ export async function runOptimization(
   // Stage 1 — resolve to TMDb ids (chunked).
   const keyToTmdb: Record<string, number> = {}
   let unresolvedCount = 0
-  const resolveChunks = await mapLimit(chunk(resolveInput, CHUNK_SIZE), CHUNK_CONCURRENCY, (batch) =>
-    resolveFilms(cfg, batch),
-  )
+  const resolveBatches = chunk(resolveInput, CHUNK_SIZE)
+  onProgress?.({ stage: 'resolving', completed: 0, total: resolveBatches.length })
+  let resolveDone = 0
+  const resolveChunks = await mapLimit(resolveBatches, CHUNK_CONCURRENCY, async (batch) => {
+    const r = await resolveFilms(cfg, batch)
+    onProgress?.({ stage: 'resolving', completed: ++resolveDone, total: resolveBatches.length })
+    return r
+  })
   for (const r of resolveChunks) {
     if (!r.ok) return { ok: false, error: r.failure.error.message }
     Object.assign(keyToTmdb, r.data.resolved)
@@ -94,9 +110,14 @@ export async function runOptimization(
   // degrades gracefully: those films fall through to orphans.
   const providersById: Record<number, FilmProviders> = {}
   if (tmdbIds.length > 0) {
-    const wpChunks = await mapLimit(chunk(tmdbIds, CHUNK_SIZE), CHUNK_CONCURRENCY, (batch) =>
-      getWatchProviders(cfg, batch, config.region),
-    )
+    const wpBatches = chunk(tmdbIds, CHUNK_SIZE)
+    onProgress?.({ stage: 'availability', completed: 0, total: wpBatches.length })
+    let wpDone = 0
+    const wpChunks = await mapLimit(wpBatches, CHUNK_CONCURRENCY, async (batch) => {
+      const w = await getWatchProviders(cfg, batch, config.region)
+      onProgress?.({ stage: 'availability', completed: ++wpDone, total: wpBatches.length })
+      return w
+    })
     for (const w of wpChunks) {
       if (w.ok) Object.assign(providersById, w.data.providers)
     }

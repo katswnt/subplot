@@ -64,30 +64,33 @@ export default function ConfigureStep({
         Imported <strong style={{ color: 'var(--text)' }}>{filmCount}</strong> films from {source}.
       </p>
 
-      <div style={card}>
-        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }} htmlFor="region">
-          Region
-        </label>
-        <select
-          id="region"
-          value={region}
-          onChange={(e) => onRegionChange(e.target.value)}
-          style={{
-            background: 'var(--surface-raised)',
-            color: 'var(--text)',
-            border: '1px solid var(--border)',
-            borderRadius: 10,
-            padding: '0.5rem 0.75rem',
-            fontSize: '0.9rem',
-          }}
-        >
-          {REGIONS.map((r) => (
-            <option key={r} value={r}>
-              {r}
-            </option>
-          ))}
-        </select>
-      </div>
+      {/* Region picker only appears once more than one region is priced. */}
+      {REGIONS.length > 1 && (
+        <div style={card}>
+          <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }} htmlFor="region">
+            Region
+          </label>
+          <select
+            id="region"
+            value={region}
+            onChange={(e) => onRegionChange(e.target.value)}
+            style={{
+              background: 'var(--surface-raised)',
+              color: 'var(--text)',
+              border: '1px solid var(--border)',
+              borderRadius: 10,
+              padding: '0.5rem 0.75rem',
+              fontSize: '0.9rem',
+            }}
+          >
+            {REGIONS.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <div style={card}>
         <p style={{ margin: '0 0 0.5rem', fontSize: '0.9rem' }}>Services you already pay for</p>
