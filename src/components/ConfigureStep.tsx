@@ -8,9 +8,11 @@ type Props = {
   ownedServices: string[]
   maxServices: number | null
   includeLibraryFree: boolean
+  adFreeOnly: boolean
   running: boolean
   onToggleOwned: (slug: string) => void
   onToggleLibrary: () => void
+  onToggleAdFree: () => void
   onRegionChange: (region: string) => void
   onMaxServicesChange: (max: number | null) => void
   onRun: () => void
@@ -50,9 +52,11 @@ export default function ConfigureStep({
   ownedServices,
   maxServices,
   includeLibraryFree,
+  adFreeOnly,
   running,
   onToggleOwned,
   onToggleLibrary,
+  onToggleAdFree,
   onRegionChange,
   onMaxServicesChange,
   onRun,
@@ -147,6 +151,21 @@ export default function ConfigureStep({
             </button>
           ))}
         </div>
+      </div>
+
+      <div style={card}>
+        <button
+          type="button"
+          aria-pressed={adFreeOnly}
+          onClick={onToggleAdFree}
+          style={{ ...chip(adFreeOnly), padding: '0.4rem 0.9rem' }}
+        >
+          {adFreeOnly ? '✓ ' : ''}Ad-free pricing only
+        </button>
+        <p style={{ margin: '0.5rem 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+          Price each service&rsquo;s ad-free tier (and drop always-ads services like Tubi &amp; Pluto). Off = the
+          cheapest tier, which may include ads.
+        </p>
       </div>
 
       <div style={{ ...card, opacity: 0.75 }}>

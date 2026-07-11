@@ -24,6 +24,7 @@ export default function App() {
   const [region, setRegion] = useState('US')
   const [owned, setOwned] = useState<string[]>([])
   const [includeLibraryFree, setIncludeLibraryFree] = useState(true)
+  const [adFreeOnly, setAdFreeOnly] = useState(false)
   const [maxServices, setMaxServices] = useState<number | null>(null)
   const [running, setRunning] = useState(false)
   const [progress, setProgress] = useState<{ pct: number; label: string } | null>(null)
@@ -46,7 +47,13 @@ export default function App() {
     setProgress({ pct: 0, label: 'Reading your watchlist…' })
     const outcome = await runOptimization(
       films,
-      { region, ownedServices: owned, maxServices: maxServices ?? undefined, includeLibraryFree },
+      {
+        region,
+        ownedServices: owned,
+        maxServices: maxServices ?? undefined,
+        includeLibraryFree,
+        tierPolicy: adFreeOnly ? 'adfree' : 'cheapest',
+      },
       (p) => setProgress(progressView(p)),
     )
     setRunning(false)
@@ -114,9 +121,11 @@ export default function App() {
             ownedServices={owned}
             maxServices={maxServices}
             includeLibraryFree={includeLibraryFree}
+            adFreeOnly={adFreeOnly}
             running={running}
             onToggleOwned={toggleOwned}
             onToggleLibrary={() => setIncludeLibraryFree((v) => !v)}
+            onToggleAdFree={() => setAdFreeOnly((v) => !v)}
             onRegionChange={setRegion}
             onMaxServicesChange={setMaxServices}
             onRun={run}
