@@ -1,5 +1,5 @@
-import { SERVICES, type ServiceTier, type StreamingService } from '@letterboxd-wrappd/domain/streaming'
-import { formatMoney } from '../lib/explain'
+import { SERVICES, type StreamingService } from '@letterboxd-wrappd/domain/streaming'
+import { formatMoney, ownedTierFor } from '../lib/explain'
 
 export type AdPolicy = 'cheapest' | 'adfree' | 'noads'
 
@@ -65,19 +65,6 @@ const adPolicyHint: Record<AdPolicy, string> = {
   cheapest: '→ Cheapest tier per service — may include ads. Free ad-supported services count.',
   adfree: '→ Priced at each service’s ad-free tier. Free ad-supported services still count.',
   noads: '→ Ad-free tiers, and free ad-supported services (Tubi, Pluto…) are dropped.',
-}
-
-/** The tier an owned service is billed at, given policy + any manual override. */
-function ownedTierOf(svc: StreamingService, policy: AdPolicy, override?: string): ServiceTier {
-  if (override) {
-    const t = svc.tiers.find((x) => x.id === override)
-    if (t) return t
-  }
-  if (policy !== 'cheapest') {
-    const t = svc.tiers.find((x) => !x.ads)
-    if (t) return t
-  }
-  return [...svc.tiers].sort((a, b) => a.monthly - b.monthly)[0]
 }
 
 const Segmented = <T,>({
@@ -211,7 +198,7 @@ export default function OptimizerControls({
           .map((slug) => services.find((s) => s.slug === slug))
           .filter((s): s is StreamingService => !!s && s.kind === 'paid')
           .map((svc) => {
-            const tier = ownedTierOf(svc, adPolicy, ownedTier[svc.slug])
+            const tier = ownedTierFor(region, svc.slug, adPolicy, ownedTier[svc.slug]) ?? svc.tiers[0]
             const editing = editingTier === svc.slug
             return (
               <div key={svc.slug} style={{ marginTop: 10 }}>

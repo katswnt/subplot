@@ -1,8 +1,28 @@
-import { serviceBySlug, type StreamingResult } from '@letterboxd-wrappd/domain/streaming'
+import { serviceBySlug, type ServiceTier, type StreamingResult } from '@letterboxd-wrappd/domain/streaming'
 
 /** Pure formatters that turn an optimizer result into human-readable copy. */
 
 export type AdPolicy = 'cheapest' | 'adfree' | 'noads'
+
+/** The tier an owned service is billed at, given policy + any manual override. */
+export function ownedTierFor(
+  region: string,
+  slug: string,
+  policy: AdPolicy,
+  override?: string,
+): ServiceTier | undefined {
+  const svc = serviceBySlug[region]?.[slug]
+  if (!svc) return undefined
+  if (override) {
+    const t = svc.tiers.find((x) => x.id === override)
+    if (t) return t
+  }
+  if (policy !== 'cheapest') {
+    const t = svc.tiers.find((x) => !x.ads)
+    if (t) return t
+  }
+  return [...svc.tiers].sort((a, b) => a.monthly - b.monthly)[0]
+}
 
 export const serviceLabel = (region: string, slug: string): string =>
   serviceBySlug[region]?.[slug]?.name ?? slug
@@ -51,6 +71,7 @@ export function describeRecommended(result: StreamingResult): string {
 
 export type MarginalStep = {
   /** The single service added at this step. */
+  slug: string
   name: string
   coveredCount: number
   /** Cumulative $/mo after this step. */
@@ -72,6 +93,7 @@ export function marginalSteps(result: StreamingResult): MarginalStep[] {
   let prevCost = 0
   return result.marginalPath.map((m) => {
     const step: MarginalStep = {
+      slug: m.serviceId,
       name: serviceLabel(result.region, m.serviceId),
       coveredCount: m.coveredCount,
       monthlyCost: m.monthlyCost,

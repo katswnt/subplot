@@ -239,11 +239,32 @@ export default function App() {
 
       {phase === 'results' && result && (
         <>
-          <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.9rem', textAlign: 'center' }}>
-            Tweak anything below — results update instantly, no re-upload.
-          </p>
-          <OptimizerControls {...controlProps} />
-          <ResultsStep result={result} unresolvedCount={unresolved} onStartOver={startOver} />
+          <ResultsStep
+            result={result}
+            adPolicy={adPolicy}
+            region={region}
+            ownedTier={ownedTier}
+            unresolvedCount={unresolved}
+            onStartOver={startOver}
+          />
+          <details style={{ marginTop: 4 }}>
+            <summary
+              style={{
+                cursor: 'pointer',
+                listStyle: 'none',
+                color: 'var(--amber)',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 12.5,
+                textDecoration: 'underline',
+                textDecorationStyle: 'dotted',
+              }}
+            >
+              Adjust — results update instantly, no re-upload
+            </summary>
+            <div style={{ marginTop: 16 }}>
+              <OptimizerControls {...controlProps} />
+            </div>
+          </details>
         </>
       )}
         </div>
