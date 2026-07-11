@@ -13,12 +13,14 @@
   "dependencies": {
     "@letterboxd-wrappd/api-client": "*",
     "@letterboxd-wrappd/domain": "*",
+    "ioredis": "^5.9.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "@vercel/node": "^3.2.24",
+    "@vercel/node": "^5.5.23",
     "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "~5.9.3",
     "vite": "^7.0.0"
   }
 }
