@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true,
+    "paths": {
+      "@letterboxd-wrappd/domain": ["../../packages/domain/src/index.ts"],
+      "@letterboxd-wrappd/domain/*": ["../../packages/domain/src/*"],
+      "@letterboxd-wrappd/api-client": ["../../packages/api-client/src/index.ts"],
+      "@letterboxd-wrappd/api-client/*": ["../../packages/api-client/src/*"]
+    }
+  },
+  "include": ["src", "vite.config.ts"]
+}

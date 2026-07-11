@@ -1,0 +1,27 @@
+// Picked up by Vercel's per-function TypeScript bundler — without this
+// it falls back to the root tsconfig (files: []) and loses strict +
+// jsx, breaking discriminated-union narrowing in handlers and failing
+// api/share/render.tsx. Mirrors tsconfig.api.json's compilerOptions;
+// the root project-references build still uses tsconfig.api.json.
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023", "DOM"],
+    "module": "ESNext",
+    "types": ["node"],
+    "skipLibCheck": true,
+    "jsx": "react-jsx",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true
+  },
+  "include": ["**/*.ts", "**/*.tsx"]
+}

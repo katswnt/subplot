@@ -1,0 +1,36 @@
+:root {
+  --bg: #0d0f13;
+  --surface-card: #161a21;
+  --surface-raised: #1e232c;
+  --border: #2a303b;
+  --text: #f2f4f8;
+  --text-muted: #9aa4b2;
+  --accent: #ffb703;
+  --accent-2: #4cc9f0;
+  --good: #52d273;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.5;
+}
+
+a {
+  color: var(--accent-2);
+}

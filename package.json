@@ -1,0 +1,24 @@
+{
+  "name": "@letterboxd-wrappd/streaming",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Subplot — the cheapest way to watch your watchlist",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@letterboxd-wrappd/api-client": "*",
+    "@letterboxd-wrappd/domain": "*",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@vercel/node": "^3.2.24",
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^7.0.0"
+  }
+}
