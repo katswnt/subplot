@@ -5,7 +5,6 @@ import {
   marginalSteps,
   formatMoney,
   serviceLabel,
-  savingsVsAllIn,
   tierTag,
   preferenceBadge,
   ownedTierFor,
@@ -25,7 +24,7 @@ const mono: React.CSSProperties = { fontFamily: 'var(--font-mono)' }
 const perf: React.CSSProperties = { borderTop: '2px dashed var(--perf)', margin: '18px 0' }
 const groupLabel = (color: string): React.CSSProperties => ({
   ...mono,
-  fontSize: 10.5,
+  fontSize: 11,
   letterSpacing: '0.18em',
   color,
   margin: '0 0 12px',
@@ -73,15 +72,16 @@ export default function ResultsStep({
   const steps = marginalSteps(result)
   const recSteps = steps.filter((s) => s.recommended)
   const moreSteps = steps.filter((s) => !s.recommended)
-  const savings = savingsVsAllIn(result)
-  const youAlreadyPay =
-    Math.round(
-      result.owned.reduce(
-        (sum, o) => sum + (ownedTierFor(region, o.slug, adPolicy, ownedTier[o.slug])?.monthly ?? 0),
-        0,
-      ) * 100,
-    ) / 100
-  const coveragePct = result.totalFilms ? Math.round((rec.coveredCount / result.totalFilms) * 100) : 0
+
+  const total = result.totalFilms
+  const included = result.baselineCoveredCount // free + owned, $0 extra
+  const added = Math.max(0, rec.coveredCount - included)
+  const includedPct = total ? (included / total) * 100 : 0
+  const addedPct = total ? (added / total) * 100 : 0
+
+  const freeNames = result.free.map((f) => serviceLabel(region, f.slug))
+  const freeTeaser =
+    freeNames.length <= 3 ? freeNames.join(', ') : `${freeNames.slice(0, 3).join(', ')} + ${freeNames.length - 3} more`
   const period = new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' }).toUpperCase()
 
   const receiptRef = useRef<HTMLDivElement>(null)
@@ -96,7 +96,7 @@ export default function ResultsStep({
       a.download = 'subplot-receipt.png'
       a.click()
     } catch {
-      /* saving is best-effort */
+      /* best-effort */
     } finally {
       setSaving(false)
     }
@@ -123,6 +123,27 @@ export default function ResultsStep({
         </div>
         <div style={{ borderTop: '1px solid var(--border-12)', margin: '12px 0 18px' }} />
 
+        {/* FREE hero strip */}
+        {result.freeCoveredCount > 0 && (
+          <div
+            data-testid="free-summary"
+            style={{
+              background: 'var(--lime-fill)',
+              border: '1px solid var(--lime-border)',
+              borderRadius: 12,
+              padding: '11px 13px',
+              marginBottom: 18,
+            }}
+          >
+            <p style={{ ...mono, fontSize: 12.5, margin: 0, color: 'var(--lime)', fontWeight: 600 }}>
+              {result.freeCoveredCount} FILMS FREE · $0.00
+            </p>
+            <p style={{ ...mono, fontSize: 11, margin: '3px 0 0', color: 'var(--text-dim)' }}>
+              already streaming on {freeTeaser}
+            </p>
+          </div>
+        )}
+
         {/* Total */}
         <p style={{ ...mono, fontSize: 10.5, letterSpacing: '0.14em', color: 'var(--text-muted)', margin: 0 }}>
           {owns ? 'YOU ADD / MONTH' : 'MONTHLY TOTAL'}
@@ -136,66 +157,14 @@ export default function ResultsStep({
           </span>
           <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>/mo</span>
         </div>
-        <p style={{ fontSize: 12, color: 'var(--text-dim)', margin: '0 0 4px' }}>{preferenceBadge(adPolicy)}</p>
-        <p style={{ fontSize: 12, color: 'var(--text-dim)', margin: 0 }}>
-          {owns && <>on top of the {formatMoney(youAlreadyPay)} you already pay · </>}
-          {!owns && savings > 0 && <>vs {formatMoney(result.allInCost)} all-in · </>}
-          {savings > 0 && <span style={{ color: 'var(--amber)' }}>save {formatMoney(savings)} vs all-in</span>}
-        </p>
-
-        {/* FREE — what you can already watch at no cost */}
-        {result.free.length > 0 && (
-          <>
-            <div style={perf} />
-            <p style={groupLabel('var(--lime)')} data-testid="free-summary">
-              FREE · {result.freeCoveredCount} FILMS, NO CHARGE
-            </p>
-            {result.free.map((f) => (
-              <Line
-                key={f.slug}
-                left={
-                  <span data-testid="free-service">
-                    {f.kind === 'free-library' ? '📚' : '▶'} {serviceLabel(region, f.slug)}
-                  </span>
-                }
-                count={`${f.coveredCount} films`}
-                price="$0.00"
-                leaderColor="var(--lime-leader)"
-                countColor="var(--lime)"
-              />
-            ))}
-          </>
-        )}
-
-        {/* CREDITED — services you already own */}
-        {owns && (
-          <>
-            <div style={perf} />
-            <div style={{ opacity: 0.68 }}>
-              <p style={groupLabel('var(--text-dimmer)')}>ALREADY PAYING · CREDITED</p>
-              {result.owned.map((o) => {
-                const tier = ownedTierFor(region, o.slug, adPolicy, ownedTier[o.slug])
-                return (
-                  <Line
-                    key={o.slug}
-                    left={<>● {serviceLabel(region, o.slug)}</>}
-                    tag={tier?.label}
-                    count={`${o.coveredCount} films`}
-                    price={formatMoney(tier?.monthly ?? 0)}
-                    nameColor="var(--text-dim)"
-                  />
-                )
-              })}
-            </div>
-          </>
-        )}
+        <p style={{ fontSize: 12, color: 'var(--text-dim)', margin: 0 }}>{preferenceBadge(adPolicy)}</p>
 
         {/* WHAT TO ADD — the hero */}
         <div style={perf} />
         <p style={groupLabel('var(--lime)')}>WHAT TO ADD</p>
         {recSteps.length === 0 ? (
-          <p style={{ ...mono, fontSize: 12.5, color: 'var(--text-dim)', margin: 0 }}>
-            Nothing to add — you&rsquo;re covered by what&rsquo;s free{owns ? ' and what you own' : ''}.
+          <p style={{ ...mono, fontSize: 12.5, color: 'var(--text-2)', margin: 0 }}>
+            Nice — your free{owns ? ' and owned' : ''} services already cover everything we can.
           </p>
         ) : (
           recSteps.map((s) => (
@@ -212,39 +181,78 @@ export default function ResultsStep({
           ))
         )}
 
-        {/* IF YOU WANT MORE — de-emphasized */}
+        {/* IF YOU WANT MORE — de-emphasized via explicit colors, not opacity */}
         {moreSteps.length > 0 && (
           <>
             <div style={perf} />
-            <div style={{ opacity: 0.6 }}>
-              <p style={groupLabel('var(--text-dimmer)')}>IF YOU WANT MORE</p>
-              <p style={{ fontSize: 11.5, color: 'var(--text-dim)', margin: '-6px 0 8px' }}>
-                Optional — each adds fewer films for more money.
-              </p>
-              {moreSteps.map((s) => (
-                <Line
-                  key={s.slug}
-                  left={<>＋ {s.name}</>}
-                  tag={tierTag(region, s.slug, adPolicy)}
-                  count={`+${s.addFilms}`}
-                  price={`+${formatMoney(s.addCost)}`}
-                  nameColor="var(--text-dim)"
-                />
-              ))}
-            </div>
+            <p style={groupLabel('var(--text-dimmer)')}>IF YOU WANT MORE</p>
+            <p style={{ fontSize: 11.5, color: 'var(--text-dim)', margin: '-6px 0 8px' }}>
+              Optional — each adds fewer films for more money.
+            </p>
+            {moreSteps.map((s) => (
+              <Line
+                key={s.slug}
+                left={<>＋ {s.name}</>}
+                tag={tierTag(region, s.slug, adPolicy)}
+                count={`+${s.addFilms}`}
+                price={`+${formatMoney(s.addCost)}`}
+                nameColor="var(--text-dim)"
+                countColor="var(--text-dimmer)"
+              />
+            ))}
           </>
         )}
 
-        {/* Coverage */}
+        {/* INCLUDED · NO EXTRA COST — free + owned */}
+        {(result.free.length > 0 || owns) && (
+          <>
+            <div style={perf} />
+            <p style={groupLabel('var(--text-dimmer)')}>INCLUDED · NO EXTRA COST</p>
+            {result.free.map((f) => (
+              <Line
+                key={f.slug}
+                left={
+                  <span data-testid="free-service">
+                    ◉ {serviceLabel(region, f.slug)}
+                  </span>
+                }
+                tag={f.kind === 'free-library' ? 'library' : 'free · ads'}
+                count={`${f.coveredCount} films`}
+                price="$0.00"
+                nameColor="var(--text-2)"
+              />
+            ))}
+            {result.owned.map((o) => {
+              const tier = ownedTierFor(region, o.slug, adPolicy, ownedTier[o.slug])
+              return (
+                <Line
+                  key={o.slug}
+                  left={<>● {serviceLabel(region, o.slug)}</>}
+                  tag={tier?.label}
+                  count={`${o.coveredCount} films`}
+                  price={formatMoney(tier?.monthly ?? 0)}
+                  nameColor="var(--text-2)"
+                />
+              )
+            })}
+          </>
+        )}
+
+        {/* Coverage — two-tone bar */}
         <div style={perf} />
         <div style={{ display: 'flex', justifyContent: 'space-between', ...mono, fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>
           <span>COVERED</span>
           <span data-testid="coverage">
-            {rec.coveredCount} / {result.totalFilms} films
+            {rec.coveredCount} / {total} films
           </span>
         </div>
-        <div style={{ height: 9, borderRadius: 999, background: 'var(--border-12)', overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${coveragePct}%`, background: 'var(--lime)', borderRadius: 999 }} />
+        <div style={{ display: 'flex', height: 9, borderRadius: 999, background: 'var(--border-12)', overflow: 'hidden' }}>
+          <div style={{ width: `${includedPct}%`, background: '#7cc93d' }} />
+          <div style={{ width: `${addedPct}%`, background: 'var(--lime)' }} />
+        </div>
+        <div style={{ display: 'flex', gap: 16, ...mono, fontSize: 10, color: 'var(--text-dim)', margin: '8px 0 0' }}>
+          <span><span style={{ color: '#7cc93d' }}>■</span> free / included</span>
+          <span><span style={{ color: 'var(--lime)' }}>■</span> added</span>
         </div>
         {(result.orphans.length > 0 || unresolvedCount > 0) && (
           <p style={{ ...mono, fontSize: 11, color: 'var(--text-dimmer)', margin: '10px 0 0' }} data-testid="orphans-note">
