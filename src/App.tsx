@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import type { ImportedFilm, ImportSource } from '@letterboxd-wrappd/domain/imports'
 import { optimizeStreaming, type StreamingFilm } from '@letterboxd-wrappd/domain/streaming'
 import ImportStep from './components/ImportStep'
-import OptimizerControls, { type AdPolicy } from './components/OptimizerControls'
+import OptimizerControls, { type AdPolicy, type Objective } from './components/OptimizerControls'
 import ResultsStep from './components/ResultsStep'
 import { resolveWatchlist, type PipelineProgress } from './lib/pipeline'
 
@@ -35,10 +35,9 @@ export default function App() {
   const [owned, setOwned] = useState<string[]>([])
   const [includeLibraryFree, setIncludeLibraryFree] = useState(true)
   const [adPolicy, setAdPolicy] = useState<AdPolicy>('adfree')
-  // Spending limit: knee (best value) / budget ($ cap) / count (# services).
-  const [limitMode, setLimitMode] = useState<'knee' | 'budget' | 'count'>('knee')
-  const [budget, setBudget] = useState<number>(20)
-  const [maxCount, setMaxCount] = useState<1 | 2 | 3>(2)
+  // What the recommendation optimizes for, + an optional hard budget cap ($).
+  const [objective, setObjective] = useState<Objective>('value')
+  const [budget, setBudget] = useState<number | null>(null)
   // Manual tier overrides for owned services (display-only: which tier you pay).
   const [ownedTier, setOwnedTier] = useState<Record<string, string>>({})
   const [editingTier, setEditingTier] = useState<string | null>(null)
@@ -55,13 +54,13 @@ export default function App() {
     return optimizeStreaming(resolved, {
       region,
       ownedServices: owned,
-      maxServices: limitMode === 'count' ? maxCount : undefined,
+      objective,
       includeLibraryFree,
       tierPolicy: adPolicy === 'cheapest' ? 'cheapest' : 'adfree',
       excludeAdSupportedFree: adPolicy === 'noads',
-      maxBudget: limitMode === 'budget' ? budget : undefined,
+      maxBudget: budget ?? undefined,
     })
-  }, [resolved, region, owned, limitMode, budget, maxCount, includeLibraryFree, adPolicy])
+  }, [resolved, region, owned, objective, budget, includeLibraryFree, adPolicy])
 
   const handleImported = (src: ImportSource, imported: ImportedFilm[]) => {
     setSource(src)
@@ -89,17 +88,15 @@ export default function App() {
     ownedServices: owned,
     includeLibraryFree,
     adPolicy,
-    limitMode,
+    objective,
     budget,
-    maxCount,
     ownedTier,
     editingTier,
     onToggleOwned: toggleOwned,
     onToggleLibrary: () => setIncludeLibraryFree((v) => !v),
     onAdPolicyChange: setAdPolicy,
-    onLimitModeChange: setLimitMode,
+    onObjectiveChange: setObjective,
     onBudgetChange: setBudget,
-    onMaxCountChange: setMaxCount,
     onRegionChange: setRegion,
     onEditTier: (slug: string | null) => setEditingTier((e) => (e === slug ? null : slug)),
     onSetTier: (slug: string, tierId: string) => {

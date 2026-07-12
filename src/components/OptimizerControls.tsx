@@ -2,44 +2,46 @@ import { SERVICES, type StreamingService } from '@letterboxd-wrappd/domain/strea
 import { formatMoney, ownedTierFor } from '../lib/explain'
 
 export type AdPolicy = 'cheapest' | 'adfree' | 'noads'
-export type LimitMode = 'knee' | 'budget' | 'count'
+export type Objective = 'value' | 'coverage' | 'fewest'
 
 type Props = {
   region: string
   ownedServices: string[]
   includeLibraryFree: boolean
   adPolicy: AdPolicy
-  limitMode: LimitMode
-  budget: number
-  maxCount: 1 | 2 | 3
+  objective: Objective
+  budget: number | null
   ownedTier: Record<string, string>
   editingTier: string | null
   showRegion?: boolean
-  /** Live results panel: only Ads + Spending (owned/library/tier live on Configure). */
+  /** Live results panel: only Ads + Optimize-for + Budget (owned/library/tier live on Configure). */
   compact?: boolean
   onToggleOwned: (slug: string) => void
   onToggleLibrary: () => void
   onAdPolicyChange: (p: AdPolicy) => void
-  onLimitModeChange: (m: LimitMode) => void
-  onBudgetChange: (b: number) => void
-  onMaxCountChange: (m: 1 | 2 | 3) => void
+  onObjectiveChange: (o: Objective) => void
+  onBudgetChange: (b: number | null) => void
   onRegionChange: (r: string) => void
   onEditTier: (slug: string | null) => void
   onSetTier: (slug: string, tierId: string) => void
 }
 
 const REGIONS = Object.keys(SERVICES)
-const COUNT_OPTIONS: Array<1 | 2 | 3> = [1, 2, 3]
 const AD_OPTIONS: Array<{ label: string; value: AdPolicy }> = [
   { label: 'Cheapest', value: 'cheapest' },
   { label: 'Ad-free', value: 'adfree' },
   { label: 'No ads', value: 'noads' },
 ]
-const LIMIT_OPTIONS: Array<{ label: string; value: LimitMode }> = [
-  { label: 'Sweet spot', value: 'knee' },
-  { label: 'Budget', value: 'budget' },
-  { label: '# to add', value: 'count' },
+const OBJECTIVE_OPTIONS: Array<{ label: string; value: Objective }> = [
+  { label: 'Best value', value: 'value' },
+  { label: 'Most coverage', value: 'coverage' },
+  { label: 'Fewest services', value: 'fewest' },
 ]
+const objectiveHint: Record<Objective, string> = {
+  value: '→ Recommend only strong-value services (≈ ≤ $2 per film). Best for most people.',
+  coverage: '→ Recommend more services to cover the most films, even at weaker value.',
+  fewest: '→ Only the 1–3 services that carry the biggest chunks of your list.',
+}
 
 const card: React.CSSProperties = {
   background: 'var(--surface-card)',
@@ -121,9 +123,8 @@ export default function OptimizerControls({
   ownedServices,
   includeLibraryFree,
   adPolicy,
-  limitMode,
+  objective,
   budget,
-  maxCount,
   ownedTier,
   editingTier,
   showRegion = false,
@@ -131,9 +132,8 @@ export default function OptimizerControls({
   onToggleOwned,
   onToggleLibrary,
   onAdPolicyChange,
-  onLimitModeChange,
+  onObjectiveChange,
   onBudgetChange,
-  onMaxCountChange,
   onRegionChange,
   onEditTier,
   onSetTier,
@@ -322,30 +322,41 @@ export default function OptimizerControls({
       </div>
       )}
 
-      {/* Spending limit */}
+      {/* Optimize for */}
       <div style={card}>
-        <p style={sectionLabel}>Spending limit</p>
+        <p style={sectionLabel}>Optimize for</p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          {LIMIT_OPTIONS.map((o) => (
+          {OBJECTIVE_OPTIONS.map((o) => (
             <button
               key={o.value}
               type="button"
-              aria-pressed={limitMode === o.value}
-              onClick={() => onLimitModeChange(o.value)}
-              style={chip(limitMode === o.value)}
+              aria-pressed={objective === o.value}
+              onClick={() => onObjectiveChange(o.value)}
+              style={chip(objective === o.value)}
             >
               {o.label}
             </button>
           ))}
         </div>
+        <p style={{ margin: '12px 0 0', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-dimmer)' }}>
+          {objectiveHint[objective]}
+        </p>
+      </div>
 
-        {limitMode === 'knee' && (
-          <p style={{ margin: '12px 0 0', fontSize: 12.5, color: 'var(--text-dimmer)' }}>
-            The knee of the price/coverage curve — the best-value stopping point.
-          </p>
-        )}
-
-        {limitMode === 'budget' && (
+      {/* Optional budget cap */}
+      <div style={card}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <p style={{ ...sectionLabel, margin: 0 }}>Budget cap</p>
+          <button
+            type="button"
+            aria-pressed={budget != null}
+            onClick={() => onBudgetChange(budget == null ? 20 : null)}
+            style={{ ...chip(budget != null), padding: '5px 12px', fontSize: 12 }}
+          >
+            {budget != null ? 'On' : 'Off'}
+          </button>
+        </div>
+        {budget != null && (
           <div style={{ marginTop: 14 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
               <span style={{ fontSize: 13.5, color: 'var(--text-2)' }}>Cap how much more to spend</span>
@@ -365,27 +376,6 @@ export default function OptimizerControls({
             />
             <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--text-dimmer)' }}>
               On top of what you already pay — the most you want added to your monthly bill.
-            </p>
-          </div>
-        )}
-
-        {limitMode === 'count' && (
-          <div style={{ marginTop: 14 }}>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {COUNT_OPTIONS.map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  aria-pressed={maxCount === n}
-                  onClick={() => onMaxCountChange(n)}
-                  style={chip(maxCount === n)}
-                >
-                  {n}
-                </button>
-              ))}
-            </div>
-            <p style={{ margin: '10px 0 0', fontSize: 12.5, color: 'var(--text-dimmer)' }}>
-              Recommend at most this many new services.
             </p>
           </div>
         )}
