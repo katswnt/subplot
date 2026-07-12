@@ -268,6 +268,18 @@ export default function App() {
         </>
       )}
         </div>
+
+        <p
+          style={{
+            textAlign: 'center',
+            marginTop: 40,
+            fontFamily: 'var(--font-mono)',
+            fontSize: 11,
+            color: 'var(--text-faint)',
+          }}
+        >
+          Made by Kat Swint with a little help from Claude
+        </p>
       </div>
     </div>
   )

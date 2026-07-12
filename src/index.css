@@ -5,13 +5,13 @@
   --surface-card: #17150e;
   --raised: #221f16;
 
-  /* Text ramp (warm parchment → faint) */
+  /* Text ramp (warm parchment → faint) — raised for AA contrast on near-black */
   --text: #f4f1e6;
-  --text-2: #cfc9b4;
-  --text-muted: #a39d84;
-  --text-dim: #8a846c;
-  --text-dimmer: #6f6b52;
-  --text-faint: #57543f;
+  --text-2: #d4cfbe;
+  --text-muted: #b3ac92;
+  --text-dim: #9a9376;
+  --text-dimmer: #8a836a;
+  --text-faint: #7d765c;
 
   /* Accents */
   --lime: #c6ff3d;

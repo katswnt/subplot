@@ -58,7 +58,7 @@ const chip = (active: boolean): React.CSSProperties => ({
   padding: '7px 13px',
   fontSize: 13,
   cursor: 'pointer',
-  fontWeight: active ? 700 : 400,
+  fontWeight: 600, // constant weight → chips don't resize when selected
 })
 
 const adPolicyHint: Record<AdPolicy, string> = {
@@ -100,7 +100,7 @@ const Segmented = <T,>({
             borderRadius: 999,
             padding: '7px 15px',
             fontSize: 12.5,
-            fontWeight: active ? 700 : 400,
+            fontWeight: 600,
             cursor: 'pointer',
           }}
         >
