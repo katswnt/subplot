@@ -50,9 +50,14 @@ function Line({
 }) {
   return (
     <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, ...mono, fontSize: 12.5, padding: '5px 0' }}>
-      <span style={{ color: nameColor, fontWeight: 600 }}>{left}</span>
-      {tag && <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>{tag}</span>}
-      <span style={{ flex: 1, minWidth: 12, borderBottom: `1px dotted ${leaderColor}`, transform: 'translateY(-3px)' }} />
+      {/* name + tag wrap together; the name never splits from its ＋/● marker */}
+      <span style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 6, minWidth: 0 }}>
+        <span style={{ color: nameColor, fontWeight: 600, whiteSpace: 'nowrap' }}>{left}</span>
+        {tag && <span style={{ color: 'var(--text-dim)', fontSize: 11, whiteSpace: 'nowrap' }}>{tag}</span>}
+      </span>
+      <span
+        style={{ flex: '1 1 12px', minWidth: 12, borderBottom: `1px dotted ${leaderColor}`, transform: 'translateY(-3px)' }}
+      />
       {count && <span style={{ color: countColor, whiteSpace: 'nowrap' }}>{count}</span>}
       <span style={{ width: 64, textAlign: 'right', color: 'var(--text)', whiteSpace: 'nowrap' }}>{price}</span>
     </div>
