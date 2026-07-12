@@ -15,6 +15,8 @@ type Props = {
   ownedTier: Record<string, string>
   editingTier: string | null
   showRegion?: boolean
+  /** Live results panel: only Ads + Spending (owned/library/tier live on Configure). */
+  compact?: boolean
   onToggleOwned: (slug: string) => void
   onToggleLibrary: () => void
   onAdPolicyChange: (p: AdPolicy) => void
@@ -125,6 +127,7 @@ export default function OptimizerControls({
   ownedTier,
   editingTier,
   showRegion = false,
+  compact = false,
   onToggleOwned,
   onToggleLibrary,
   onAdPolicyChange,
@@ -179,6 +182,7 @@ export default function OptimizerControls({
       </div>
 
       {/* Already paying for */}
+      {!compact && (
       <div style={card}>
         <p style={sectionLabel}>Already paying for</p>
         <p style={{ margin: '0 0 12px', fontSize: 12.5, color: 'var(--text-dimmer)' }}>
@@ -301,8 +305,10 @@ export default function OptimizerControls({
             )
           })}
       </div>
+      )}
 
       {/* Library card */}
+      {!compact && (
       <div style={card}>
         <button
           type="button"
@@ -314,6 +320,7 @@ export default function OptimizerControls({
         </button>
         <p style={{ margin: '10px 0 0', fontSize: 12.5, color: 'var(--text-dimmer)' }}>Free with a library card.</p>
       </div>
+      )}
 
       {/* Spending limit */}
       <div style={card}>

@@ -6,16 +6,24 @@ import OptimizerControls, { type AdPolicy } from './components/OptimizerControls
 import ResultsStep from './components/ResultsStep'
 import { resolveWatchlist, type PipelineProgress } from './lib/pipeline'
 
-type Phase = 'import' | 'configure' | 'results'
+type Phase = 'import' | 'configure' | 'working' | 'results'
+type WorkStage = 'resolving' | 'availability' | 'optimize'
+type Progress = { pct: number; label: string; stage: WorkStage }
 
 // The two network stages split the bar in half each; labels stay human.
-function progressView(p: PipelineProgress): { pct: number; label: string } {
+function progressView(p: PipelineProgress): Progress {
   const frac = p.total > 0 ? p.completed / p.total : 0
   if (p.stage === 'resolving') {
-    return { pct: Math.round(frac * 50), label: 'Matching your films to the movie database…' }
+    return { pct: Math.round(frac * 45), label: 'Matching your films to the movie database…', stage: 'resolving' }
   }
-  return { pct: 50 + Math.round(frac * 50), label: 'Checking where each film streams…' }
+  return { pct: 45 + Math.round(frac * 45), label: 'Checking where each film streams…', stage: 'availability' }
 }
+
+const WORK_STEPS: Array<{ stage: WorkStage; label: string }> = [
+  { stage: 'resolving', label: 'Resolve' },
+  { stage: 'availability', label: 'Availability' },
+  { stage: 'optimize', label: 'Optimize' },
+]
 
 export default function App() {
   const [phase, setPhase] = useState<Phase>('import')
@@ -39,8 +47,7 @@ export default function App() {
   // so we recompute the recommendation from these on every control change.
   const [resolved, setResolved] = useState<StreamingFilm[] | null>(null)
   const [unresolved, setUnresolved] = useState(0)
-  const [running, setRunning] = useState(false)
-  const [progress, setProgress] = useState<{ pct: number; label: string } | null>(null)
+  const [progress, setProgress] = useState<Progress | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const result = useMemo(() => {
@@ -102,18 +109,27 @@ export default function App() {
   }
 
   const run = async () => {
-    setRunning(true)
-    setError(null)
-    setProgress({ pct: 0, label: 'Reading your watchlist…' })
-    const outcome = await resolveWatchlist(films, region, (p) => setProgress(progressView(p)))
-    setRunning(false)
-    setProgress(null)
-    if (!outcome.ok) {
-      setError(outcome.error)
+    // Already resolved (returning from Plans) → recompute is instant, no re-fetch.
+    if (resolved) {
+      setPhase('results')
       return
     }
+    setError(null)
+    setProgress({ pct: 0, label: 'Reading your watchlist…', stage: 'resolving' })
+    setPhase('working')
+    const outcome = await resolveWatchlist(films, region, (p) => setProgress(progressView(p)))
+    if (!outcome.ok) {
+      setError(outcome.error)
+      setProgress(null)
+      setPhase('configure')
+      return
+    }
+    // The optimize step is instant (pure, in useMemo) — flash it, then reveal.
+    setProgress({ pct: 100, label: 'Finding your cheapest combo…', stage: 'optimize' })
     setResolved(outcome.streamingFilms)
     setUnresolved(outcome.unresolvedCount)
+    await new Promise((r) => setTimeout(r, 350))
+    setProgress(null)
     setPhase('results')
   }
 
@@ -200,45 +216,81 @@ export default function App() {
           <button
             type="button"
             onClick={run}
-            disabled={running}
             style={{
-              background: running ? 'var(--raised)' : 'var(--lime)',
-              color: running ? 'var(--text-muted)' : 'var(--on-lime)',
+              background: 'var(--lime)',
+              color: 'var(--on-lime)',
               border: 'none',
               borderRadius: 999,
               padding: '14px 24px',
               fontFamily: 'var(--font-body)',
               fontWeight: 700,
               fontSize: 15.5,
-              cursor: running ? 'wait' : 'pointer',
+              cursor: 'pointer',
             }}
           >
-            {running ? 'Crunching your watchlist…' : 'Find my cheapest combo →'}
+            Find my cheapest combo →
           </button>
-          {progress && (
-            <div style={{ width: '100%' }} role="status" aria-live="polite">
-              <div style={{ height: 8, borderRadius: 999, background: 'var(--raised)', overflow: 'hidden' }}>
-                <div
-                  style={{
-                    height: '100%',
-                    width: `${progress.pct}%`,
-                    background: 'var(--lime)',
-                    borderRadius: 999,
-                    transition: 'width 0.3s ease',
-                  }}
-                />
-              </div>
-              <p style={{ margin: '0.5rem 0 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                {progress.label} {progress.pct}%
-              </p>
-            </div>
-          )}
           {error && (
             <p role="alert" style={{ color: '#ff6b6b', fontSize: '0.9rem', margin: 0 }}>
               {error}
             </p>
           )}
         </>
+      )}
+
+      {phase === 'working' && progress && (
+        <div style={{ padding: '24px 0' }} role="status" aria-live="polite">
+          {/* Staged stepper */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
+            {WORK_STEPS.map((step, i) => {
+              const activeIdx = WORK_STEPS.findIndex((s) => s.stage === progress.stage)
+              const done = i < activeIdx
+              const active = i === activeIdx
+              return (
+                <div key={step.stage} style={{ flex: 1 }}>
+                  <div
+                    style={{
+                      height: 4,
+                      borderRadius: 999,
+                      background: done || active ? 'var(--lime)' : 'var(--raised)',
+                      opacity: active ? 1 : done ? 0.6 : 1,
+                    }}
+                  />
+                  <p
+                    style={{
+                      margin: '8px 0 0',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 10.5,
+                      letterSpacing: '0.06em',
+                      color: active ? 'var(--lime)' : 'var(--text-dim)',
+                    }}
+                  >
+                    {i + 1} · {step.label}
+                  </p>
+                </div>
+              )
+            })}
+          </div>
+
+          <div style={{ height: 8, borderRadius: 999, background: 'var(--raised)', overflow: 'hidden' }}>
+            <div
+              style={{
+                height: '100%',
+                width: `${progress.pct}%`,
+                background: 'var(--lime)',
+                borderRadius: 999,
+                transition: 'width 0.3s ease',
+              }}
+            />
+          </div>
+          <p style={{ margin: '12px 0 0', color: 'var(--text-2)', fontSize: 14 }}>
+            {progress.label} <span style={{ color: 'var(--text-dim)' }}>{progress.pct}%</span>
+          </p>
+          <p style={{ margin: '8px 0 0', color: 'var(--text-dimmer)', fontSize: 12.5, lineHeight: 1.5 }}>
+            A big library can take 30–60s the first time as we look up every film. Repeat runs are cached and
+            near-instant.
+          </p>
+        </div>
       )}
 
       {phase === 'results' && result && (
@@ -251,22 +303,38 @@ export default function App() {
             unresolvedCount={unresolved}
             onStartOver={startOver}
           />
-          <details style={{ marginTop: 4 }}>
+          <details open style={{ marginTop: 4 }}>
             <summary
               style={{
                 cursor: 'pointer',
                 listStyle: 'none',
-                color: 'var(--amber)',
+                color: 'var(--lime)',
                 fontFamily: 'var(--font-mono)',
-                fontSize: 12.5,
-                textDecoration: 'underline',
-                textDecorationStyle: 'dotted',
+                fontSize: 11,
+                letterSpacing: '0.14em',
               }}
             >
-              Adjust — results update instantly, no re-upload
+              ADJUST · UPDATES LIVE
             </summary>
             <div style={{ marginTop: 16 }}>
-              <OptimizerControls {...controlProps} />
+              <OptimizerControls {...controlProps} compact />
+              <button
+                type="button"
+                onClick={() => setPhase('configure')}
+                style={{
+                  marginTop: 14,
+                  background: 'transparent',
+                  border: '1px solid rgba(255,179,0,0.4)',
+                  borderRadius: 999,
+                  padding: '9px 16px',
+                  cursor: 'pointer',
+                  color: 'var(--amber)',
+                  fontSize: 13,
+                  fontWeight: 600,
+                }}
+              >
+                Plans → edit owned services &amp; tiers
+              </button>
             </div>
           </details>
         </>
