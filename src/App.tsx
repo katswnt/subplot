@@ -26,9 +26,11 @@ export default function App() {
   const [region, setRegion] = useState('US')
   const [owned, setOwned] = useState<string[]>([])
   const [includeLibraryFree, setIncludeLibraryFree] = useState(true)
-  const [adPolicy, setAdPolicy] = useState<AdPolicy>('cheapest')
-  const [budget, setBudget] = useState<number | null>(null)
-  const [maxServices, setMaxServices] = useState<number | null>(null)
+  const [adPolicy, setAdPolicy] = useState<AdPolicy>('adfree')
+  // Spending limit: knee (best value) / budget ($ cap) / count (# services).
+  const [limitMode, setLimitMode] = useState<'knee' | 'budget' | 'count'>('knee')
+  const [budget, setBudget] = useState<number>(20)
+  const [maxCount, setMaxCount] = useState<1 | 2 | 3>(2)
   // Manual tier overrides for owned services (display-only: which tier you pay).
   const [ownedTier, setOwnedTier] = useState<Record<string, string>>({})
   const [editingTier, setEditingTier] = useState<string | null>(null)
@@ -46,13 +48,13 @@ export default function App() {
     return optimizeStreaming(resolved, {
       region,
       ownedServices: owned,
-      maxServices: maxServices ?? undefined,
+      maxServices: limitMode === 'count' ? maxCount : undefined,
       includeLibraryFree,
       tierPolicy: adPolicy === 'cheapest' ? 'cheapest' : 'adfree',
       excludeAdSupportedFree: adPolicy === 'noads',
-      maxBudget: budget ?? undefined,
+      maxBudget: limitMode === 'budget' ? budget : undefined,
     })
-  }, [resolved, region, owned, maxServices, includeLibraryFree, adPolicy, budget])
+  }, [resolved, region, owned, limitMode, budget, maxCount, includeLibraryFree, adPolicy])
 
   const handleImported = (src: ImportSource, imported: ImportedFilm[]) => {
     setSource(src)
@@ -80,15 +82,17 @@ export default function App() {
     ownedServices: owned,
     includeLibraryFree,
     adPolicy,
+    limitMode,
     budget,
-    maxServices,
+    maxCount,
     ownedTier,
     editingTier,
     onToggleOwned: toggleOwned,
     onToggleLibrary: () => setIncludeLibraryFree((v) => !v),
     onAdPolicyChange: setAdPolicy,
+    onLimitModeChange: setLimitMode,
     onBudgetChange: setBudget,
-    onMaxServicesChange: setMaxServices,
+    onMaxCountChange: setMaxCount,
     onRegionChange: setRegion,
     onEditTier: (slug: string | null) => setEditingTier((e) => (e === slug ? null : slug)),
     onSetTier: (slug: string, tierId: string) => {

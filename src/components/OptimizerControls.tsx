@@ -2,38 +2,41 @@ import { SERVICES, type StreamingService } from '@letterboxd-wrappd/domain/strea
 import { formatMoney, ownedTierFor } from '../lib/explain'
 
 export type AdPolicy = 'cheapest' | 'adfree' | 'noads'
+export type LimitMode = 'knee' | 'budget' | 'count'
 
 type Props = {
   region: string
   ownedServices: string[]
   includeLibraryFree: boolean
   adPolicy: AdPolicy
-  budget: number | null
-  maxServices: number | null
+  limitMode: LimitMode
+  budget: number
+  maxCount: 1 | 2 | 3
   ownedTier: Record<string, string>
   editingTier: string | null
   showRegion?: boolean
   onToggleOwned: (slug: string) => void
   onToggleLibrary: () => void
   onAdPolicyChange: (p: AdPolicy) => void
-  onBudgetChange: (b: number | null) => void
-  onMaxServicesChange: (m: number | null) => void
+  onLimitModeChange: (m: LimitMode) => void
+  onBudgetChange: (b: number) => void
+  onMaxCountChange: (m: 1 | 2 | 3) => void
   onRegionChange: (r: string) => void
   onEditTier: (slug: string | null) => void
   onSetTier: (slug: string, tierId: string) => void
 }
 
 const REGIONS = Object.keys(SERVICES)
-const MAX_OPTIONS: Array<{ label: string; value: number | null }> = [
-  { label: 'Any', value: null },
-  { label: '1', value: 1 },
-  { label: '2', value: 2 },
-  { label: '3', value: 3 },
-]
+const COUNT_OPTIONS: Array<1 | 2 | 3> = [1, 2, 3]
 const AD_OPTIONS: Array<{ label: string; value: AdPolicy }> = [
   { label: 'Cheapest', value: 'cheapest' },
   { label: 'Ad-free', value: 'adfree' },
   { label: 'No ads', value: 'noads' },
+]
+const LIMIT_OPTIONS: Array<{ label: string; value: LimitMode }> = [
+  { label: 'Sweet spot', value: 'knee' },
+  { label: 'Budget', value: 'budget' },
+  { label: '# to add', value: 'count' },
 ]
 
 const card: React.CSSProperties = {
@@ -116,16 +119,18 @@ export default function OptimizerControls({
   ownedServices,
   includeLibraryFree,
   adPolicy,
+  limitMode,
   budget,
-  maxServices,
+  maxCount,
   ownedTier,
   editingTier,
   showRegion = false,
   onToggleOwned,
   onToggleLibrary,
   onAdPolicyChange,
+  onLimitModeChange,
   onBudgetChange,
-  onMaxServicesChange,
+  onMaxCountChange,
   onRegionChange,
   onEditTier,
   onSetTier,
@@ -310,55 +315,73 @@ export default function OptimizerControls({
         <p style={{ margin: '10px 0 0', fontSize: 12.5, color: 'var(--text-dimmer)' }}>Free with a library card.</p>
       </div>
 
-      {/* Monthly budget */}
+      {/* Spending limit */}
       <div style={card}>
-        <p style={sectionLabel}>Monthly budget · optional</p>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ color: 'var(--text-muted)' }}>$</span>
-          <input
-            aria-label="Monthly budget"
-            type="number"
-            min={0}
-            step={1}
-            inputMode="decimal"
-            placeholder="no limit"
-            value={budget ?? ''}
-            onChange={(e) => {
-              const v = e.target.value.trim()
-              onBudgetChange(v === '' ? null : Math.max(0, Number(v)))
-            }}
-            style={{
-              width: 130,
-              background: 'var(--raised)',
-              color: 'var(--text)',
-              border: '1px solid var(--border-12)',
-              borderRadius: 10,
-              padding: '11px 14px',
-              fontSize: 14.5,
-            }}
-          />
-        </div>
-        <p style={{ margin: '10px 0 0', fontSize: 12.5, color: 'var(--text-dimmer)' }}>
-          Set a cap and we&rsquo;ll fit the most films into it. Leave blank for the best-value pick.
-        </p>
-      </div>
-
-      {/* Max services to add */}
-      <div style={card}>
-        <p style={sectionLabel}>Max services to add</p>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {MAX_OPTIONS.map((o) => (
+        <p style={sectionLabel}>Spending limit</p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {LIMIT_OPTIONS.map((o) => (
             <button
-              key={o.label}
+              key={o.value}
               type="button"
-              aria-pressed={maxServices === o.value}
-              onClick={() => onMaxServicesChange(o.value)}
-              style={chip(maxServices === o.value)}
+              aria-pressed={limitMode === o.value}
+              onClick={() => onLimitModeChange(o.value)}
+              style={chip(limitMode === o.value)}
             >
               {o.label}
             </button>
           ))}
         </div>
+
+        {limitMode === 'knee' && (
+          <p style={{ margin: '12px 0 0', fontSize: 12.5, color: 'var(--text-dimmer)' }}>
+            The knee of the price/coverage curve — the best-value stopping point.
+          </p>
+        )}
+
+        {limitMode === 'budget' && (
+          <div style={{ marginTop: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+              <span style={{ fontSize: 13.5, color: 'var(--text-2)' }}>Cap how much more to spend</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 15, color: 'var(--lime)', fontWeight: 600 }}>
+                {formatMoney(budget)}
+              </span>
+            </div>
+            <input
+              aria-label="Budget"
+              type="range"
+              min={5}
+              max={60}
+              step={1}
+              value={budget}
+              onChange={(e) => onBudgetChange(Number(e.target.value))}
+              style={{ width: '100%', accentColor: 'var(--lime)' }}
+            />
+            <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--text-dimmer)' }}>
+              On top of what you already pay — the most you want added to your monthly bill.
+            </p>
+          </div>
+        )}
+
+        {limitMode === 'count' && (
+          <div style={{ marginTop: 14 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {COUNT_OPTIONS.map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  aria-pressed={maxCount === n}
+                  onClick={() => onMaxCountChange(n)}
+                  style={chip(maxCount === n)}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+            <p style={{ margin: '10px 0 0', fontSize: 12.5, color: 'var(--text-dimmer)' }}>
+              Recommend at most this many new services.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   )
