@@ -165,9 +165,13 @@ export default function App() {
               fontWeight: 700,
               fontSize: 16,
               letterSpacing: '0.04em',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 7,
             }}
           >
-            <span style={{ color: 'var(--lime)' }}>◐</span> SUBPLOT
+            <img src="/favicon.svg" alt="" width={19} height={19} />
+            SUBPLOT
           </span>
           <span
             style={{
