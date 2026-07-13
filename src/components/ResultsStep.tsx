@@ -5,7 +5,6 @@ import {
   marginalSteps,
   formatMoney,
   serviceLabel,
-  tierTag,
   preferenceBadge,
   ownedTierFor,
   type AdPolicy,
@@ -58,8 +57,14 @@ function Line({
       <span
         style={{ flex: '1 1 12px', minWidth: 12, borderBottom: `1px dotted ${leaderColor}`, transform: 'translateY(-3px)' }}
       />
-      {count && <span style={{ color: countColor, whiteSpace: 'nowrap' }}>{count}</span>}
-      <span style={{ width: 64, textAlign: 'right', color: 'var(--text)', whiteSpace: 'nowrap' }}>{price}</span>
+      {count && (
+        <span style={{ flex: '0 0 auto', width: 84, textAlign: 'right', color: countColor, whiteSpace: 'nowrap' }}>
+          {count}
+        </span>
+      )}
+      <span style={{ flex: '0 0 auto', width: 64, textAlign: 'right', color: 'var(--text)', whiteSpace: 'nowrap' }}>
+        {price}
+      </span>
     </div>
   )
 }
@@ -176,7 +181,7 @@ export default function ResultsStep({
             <div key={s.slug} data-testid="marginal-step">
               <Line
                 left={<>＋ {s.name}</>}
-                tag={tierTag(region, s.slug, adPolicy)}
+                tag={ownedTierFor(region, s.slug, adPolicy)?.ads ? 'With ads' : undefined}
                 count={`+${s.addFilms} films`}
                 price={formatMoney(s.addCost)}
                 leaderColor="var(--lime-leader)"
@@ -198,7 +203,7 @@ export default function ResultsStep({
               <Line
                 key={s.slug}
                 left={<>＋ {s.name}</>}
-                tag={tierTag(region, s.slug, adPolicy)}
+                tag={ownedTierFor(region, s.slug, adPolicy)?.ads ? 'With ads' : undefined}
                 count={`+${s.addFilms}`}
                 price={`+${formatMoney(s.addCost)}`}
                 nameColor="var(--text-dim)"
