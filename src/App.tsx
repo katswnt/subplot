@@ -173,19 +173,6 @@ export default function App() {
             <img src="/favicon.svg" alt="" width={19} height={19} />
             SUBPLOT
           </span>
-          <span
-            style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: 10,
-              letterSpacing: '0.16em',
-              color: 'var(--amber)',
-              border: '1px solid rgba(255,179,0,0.4)',
-              borderRadius: 999,
-              padding: '3px 9px',
-            }}
-          >
-            BETA
-          </span>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: phase === 'import' ? 22 : 16 }}>
