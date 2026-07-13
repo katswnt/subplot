@@ -347,7 +347,16 @@ export default function App() {
             color: 'var(--text-faint)',
           }}
         >
-          Made by Kat Swint with a little help from Claude
+          Made by{' '}
+          <a
+            href="https://twitter.com/katswint"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: 'var(--amber)', textDecoration: 'underline', textDecorationStyle: 'dotted' }}
+          >
+            Kat Swint
+          </a>{' '}
+          with a little help from Claude
         </p>
       </div>
     </div>
