@@ -160,7 +160,7 @@ export default function ImportStep({ onImported }: Props) {
         <button type="button" onClick={loadSample} disabled={loadingSample} style={monoLink}>
           <span style={{ color: 'var(--lime)' }}>▶</span>
           <span style={{ textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: 3 }}>
-            {loadingSample ? 'Loading sample…' : 'Or try a sample watchlist — 200 films'}
+            {loadingSample ? 'Loading sample…' : 'Or try a sample watchlist — 200 titles'}
           </span>
         </button>
 
