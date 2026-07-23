@@ -14,9 +14,9 @@ type Progress = { pct: number; label: string; stage: WorkStage }
 function progressView(p: PipelineProgress): Progress {
   const frac = p.total > 0 ? p.completed / p.total : 0
   if (p.stage === 'resolving') {
-    return { pct: Math.round(frac * 45), label: 'Matching your films to the movie database…', stage: 'resolving' }
+    return { pct: Math.round(frac * 45), label: 'Matching your titles to the movie database…', stage: 'resolving' }
   }
-  return { pct: 45 + Math.round(frac * 45), label: 'Checking where each film streams…', stage: 'availability' }
+  return { pct: 45 + Math.round(frac * 45), label: 'Checking where each title streams…', stage: 'availability' }
 }
 
 const WORK_STEPS: Array<{ stage: WorkStage; label: string }> = [

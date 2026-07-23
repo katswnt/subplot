@@ -60,7 +60,7 @@ export function describeRecommended(result: StreamingResult): string {
   const c = result.recommended
   if (c.addedServices.length === 0) {
     return result.coverableCount === 0
-      ? 'None of your films are on a subscription service we track.'
+      ? 'None of your titles are on a subscription service we track.'
       : 'The services you already have cover everything we can — no additions needed.'
   }
   const names = c.addedServices.map((id) => serviceLabel(result.region, id))

@@ -38,8 +38,8 @@ const OBJECTIVE_OPTIONS: Array<{ label: string; value: Objective }> = [
   { label: 'Fewest services', value: 'fewest' },
 ]
 const objectiveHint: Record<Objective, string> = {
-  value: '→ Recommend only strong-value services (≈ ≤ $2 per film). Best for most people.',
-  coverage: '→ Recommend more services to cover the most films, even at weaker value.',
+  value: '→ Recommend only strong-value services (≈ ≤ $2 per title). Best for most people.',
+  coverage: '→ Recommend more services to cover the most titles, even at weaker value.',
   fewest: '→ Only the 1–3 services that carry the biggest chunks of your list.',
 }
 
