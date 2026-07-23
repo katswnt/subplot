@@ -64,7 +64,7 @@ export function describeRecommended(result: StreamingResult): string {
       : 'The services you already have cover everything we can — no additions needed.'
   }
   const names = c.addedServices.map((id) => serviceLabel(result.region, id))
-  return `${joinNames(names)} cover ${c.coveredCount} of ${result.totalFilms} films for ${formatMoney(
+  return `${joinNames(names)} cover ${c.coveredCount} of ${result.totalFilms} titles for ${formatMoney(
     c.monthlyCost,
   )}/mo.`
 }

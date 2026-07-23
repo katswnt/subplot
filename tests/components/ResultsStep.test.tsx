@@ -27,7 +27,7 @@ describe('ResultsStep receipt', () => {
     // Big lime total equals the recommended monthly cost.
     expect(screen.getByTestId('receipt-total').textContent).toContain(result.recommended.monthlyCost.toFixed(2));
     // Coverage line + one hero row per added service (Netflix, Max).
-    expect(screen.getByTestId('coverage').textContent).toMatch(/4 \/ 4 films/);
+    expect(screen.getByTestId('coverage').textContent).toMatch(/4 \/ 4 titles/);
     expect(screen.getAllByTestId('marginal-step').length).toBe(2);
   });
 
@@ -35,15 +35,32 @@ describe('ResultsStep receipt', () => {
     const films = [film('n1', [NETFLIX]), film('rentonly', [UNPRICED])];
     const result = optimizeStreaming(films, { region: 'US' });
     render(<ResultsStep {...base} result={result} />);
-    expect(screen.getByTestId('orphans-note').textContent).toMatch(/1 films rent\/buy only/);
+    expect(screen.getByTestId('orphans-note').textContent).toMatch(/1 titles rent\/buy only/);
   });
 
   it('surfaces a FREE section for films watchable at no cost', () => {
     const films = [film('t1', [TUBI]), film('t2', [TUBI]), film('n1', [NETFLIX])];
     const result = optimizeStreaming(films, { region: 'US' });
     render(<ResultsStep {...base} result={result} />);
-    expect(screen.getByTestId('free-summary').textContent).toMatch(/2 FILMS FREE/);
+    expect(screen.getByTestId('free-summary').textContent).toMatch(/2 TITLES FREE/);
     expect(screen.getAllByTestId('free-service').some((c) => /Tubi/.test(c.textContent ?? ''))).toBe(true);
+  });
+
+  it('surfaces the movie/show mix when the watchlist includes TV', () => {
+    const films: StreamingFilm[] = [
+      { key: 'm1', title: 'Dune', providerIds: [MAX], mediaType: 'movie' },
+      { key: 't1', title: 'The Bear', providerIds: [NETFLIX], mediaType: 'tv' },
+      { key: 't2', title: 'Severance', providerIds: [NETFLIX], mediaType: 'tv' },
+    ];
+    const result = optimizeStreaming(films, { region: 'US' });
+    render(<ResultsStep {...base} result={result} />);
+    expect(screen.getByTestId('media-mix').textContent).toMatch(/1 film · 2 TV shows/);
+  });
+
+  it('omits the movie/show mix for an all-movie watchlist', () => {
+    const result = optimizeStreaming([film('n1', [NETFLIX])], { region: 'US' });
+    render(<ResultsStep {...base} result={result} />);
+    expect(screen.queryByTestId('media-mix')).toBeNull();
   });
 
   it('credits owned services and labels the total "YOU ADD"', () => {

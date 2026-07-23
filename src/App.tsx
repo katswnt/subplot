@@ -181,7 +181,7 @@ export default function App() {
           {phase === 'configure' && (
             <>
           <p style={{ margin: 0, fontSize: 13.5, color: 'var(--text-muted)' }}>
-            Imported <strong style={{ color: 'var(--text)' }}>{films.length}</strong> films from{' '}
+            Imported <strong style={{ color: 'var(--text)' }}>{films.length}</strong> titles from{' '}
             {source === 'imdb' ? 'IMDb' : 'Letterboxd'}.{' '}
             <button
               type="button"
