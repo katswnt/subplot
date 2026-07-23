@@ -284,10 +284,9 @@ npm run gate
 
 ## Deploy
 
-Subplot is configured as a root-level Vercel project with SPA rewrites and
-60-second serverless function limits. The production project still needs to be
-reconnected to this extracted repository before the old monorepo copy is
-retired. The custom domain is
+Subplot deploys from this repository's `main` branch to a root-level Vercel
+project with SPA rewrites and 60-second serverless function limits. The custom
+domain is
 [subplot.katswint.com](https://subplot.katswint.com/).
 
 Streaming availability data is provided by **JustWatch via TMDb**.
