@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { parseWatchlist, type ImportSource, type ImportedFilm } from '@letterboxd-wrappd/domain/imports'
+import { parseWatchlist, type ImportSource, type ImportedFilm } from '@subplot/domain/imports'
 
 type Props = {
   onImported: (source: ImportSource, films: ImportedFilm[]) => void

@@ -1,4 +1,4 @@
-import { serviceBySlug, type ServiceTier, type StreamingResult } from '@letterboxd-wrappd/domain/streaming'
+import { serviceBySlug, type ServiceTier, type StreamingResult } from '@subplot/domain/streaming'
 
 /** Pure formatters that turn an optimizer result into human-readable copy. */
 

@@ -84,7 +84,9 @@ export const CACHE_KEYS = {
 } as const;
 
 export const CACHE_DURATION = {
-  // IMDb→TMDb mappings are permanent; provider availability is ~daily-stale.
+  // IMDb→TMDb mappings are effectively permanent. Availability changes often
+  // enough that a month-old answer is not trustworthy for a buying decision;
+  // one week balances freshness with TMDb traffic for this public demo.
   RESOLVE: 60 * 60 * 24 * 180, // 180 days
-  WATCH_PROVIDERS: 60 * 60 * 24 * 30, // 30 days
+  WATCH_PROVIDERS: 60 * 60 * 24 * 7, // 7 days
 } as const;

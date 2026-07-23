@@ -15,11 +15,10 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
+    "baseUrl": ".",
     "paths": {
-      "@letterboxd-wrappd/domain": ["../../packages/domain/src/index.ts"],
-      "@letterboxd-wrappd/domain/*": ["../../packages/domain/src/*"],
-      "@letterboxd-wrappd/api-client": ["../../packages/api-client/src/index.ts"],
-      "@letterboxd-wrappd/api-client/*": ["../../packages/api-client/src/*"]
+      "@subplot/domain/*": ["src/domain/*/index.ts"],
+      "@subplot/api-client": ["src/api-client/index.ts"]
     }
   },
   "include": ["src", "vite.config.ts"]

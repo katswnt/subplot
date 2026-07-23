@@ -4,9 +4,9 @@ import {
   type ApiClientConfig,
   type ResolveFilmInput,
   type FilmProviders,
-} from '@letterboxd-wrappd/api-client'
-import type { StreamingFilm } from '@letterboxd-wrappd/domain/streaming'
-import type { ImportedFilm } from '@letterboxd-wrappd/domain/imports'
+} from '@subplot/api-client'
+import type { StreamingFilm } from '@subplot/domain/streaming'
+import type { ImportedFilm } from '@subplot/domain/imports'
 
 // The result of the (expensive, once-per-region) network stage. Once we hold
 // these, optimizeStreaming is pure + instant, so the results screen can re-run
@@ -99,8 +99,9 @@ export async function resolveWatchlist(
 
   const tmdbIds = [...new Set(Object.values(keyToTmdb))]
 
-  // Stage 2 — subscription availability per TMDb id (chunked). A failed chunk
-  // degrades gracefully: those films fall through to orphans.
+  // Stage 2 — subscription availability per TMDb id (chunked). Availability is
+  // product-critical: a failed chunk must fail the run rather than making films
+  // look unavailable and turning an upstream error into a false recommendation.
   const providersById: Record<number, FilmProviders> = {}
   if (tmdbIds.length > 0) {
     const wpBatches = chunk(tmdbIds, CHUNK_SIZE)
@@ -112,7 +113,8 @@ export async function resolveWatchlist(
       return w
     })
     for (const w of wpChunks) {
-      if (w.ok) Object.assign(providersById, w.data.providers)
+      if (!w.ok) return { ok: false, error: w.failure.error.message }
+      Object.assign(providersById, w.data.providers)
     }
   }
 

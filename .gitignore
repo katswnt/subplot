@@ -1,0 +1,20 @@
+# Dependencies and build output
+node_modules/
+dist/
+.cache/
+*.tsbuildinfo
+
+# Local environment and hosting state
+.env
+.env.*
+!.env.example
+.vercel/
+
+# Test and editor artifacts
+coverage/
+test-results/
+playwright-report/
+.DS_Store
+*.log
+.idea/
+.vscode/

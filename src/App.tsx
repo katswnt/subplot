@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
-import type { ImportedFilm, ImportSource } from '@letterboxd-wrappd/domain/imports'
-import { optimizeStreaming, type StreamingFilm } from '@letterboxd-wrappd/domain/streaming'
+import type { ImportedFilm, ImportSource } from '@subplot/domain/imports'
+import { optimizeStreaming, type StreamingFilm } from '@subplot/domain/streaming'
 import ImportStep from './components/ImportStep'
 import OptimizerControls, { type AdPolicy, type Objective } from './components/OptimizerControls'
 import ResultsStep from './components/ResultsStep'
@@ -338,16 +338,16 @@ export default function App() {
             color: 'var(--text-faint)',
           }}
         >
-          Made by{' '}
+          Built by{' '}
           <a
-            href="https://twitter.com/katswint"
+            href="https://katswint.com"
             target="_blank"
-            rel="noopener noreferrer"
+            rel="me author noopener noreferrer"
             style={{ color: 'var(--amber)', textDecoration: 'underline', textDecorationStyle: 'dotted' }}
           >
             Kat Swint
           </a>{' '}
-          with a little help from Claude
+          with a little help from Claude Code and Codex
         </p>
       </div>
     </div>

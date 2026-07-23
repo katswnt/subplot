@@ -1,10 +1,10 @@
 # Subplot — roadmap
 
-MVP (shipped): import a Letterboxd/IMDb watchlist → cheapest combination of
-subscription services that covers the most of it, on free TMDb `watch/providers`
-data + a maintained US `SUBSCRIPTION_PRICES` table. Optimizer is a greedy
-marginal path (each service unlocks the most new films; overlap counted once)
-with a recommended "knee," plus orphans (films on no tracked subscription).
+MVP (shipped): import a Letterboxd/IMDb watchlist → compare the cost and coverage
+of streaming subscription combinations using TMDb `watch/providers` data and a
+maintained US service catalog. The optimizer enumerates an exact Pareto frontier
+within a six-added-service cap. Budget recommendations come from that frontier;
+the default recommendation uses an explainable marginal-value heuristic.
 
 ## V3 (next)
 

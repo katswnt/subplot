@@ -1,4 +1,4 @@
-import { SERVICES, type StreamingService } from '@letterboxd-wrappd/domain/streaming'
+import { SERVICES, type StreamingService } from '@subplot/domain/streaming'
 import { formatMoney, ownedTierFor } from '../lib/explain'
 
 export type AdPolicy = 'cheapest' | 'adfree' | 'noads'

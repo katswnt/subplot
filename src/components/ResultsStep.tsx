@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { toPng } from 'html-to-image'
-import type { StreamingResult } from '@letterboxd-wrappd/domain/streaming'
+import type { StreamingResult } from '@subplot/domain/streaming'
 import {
   marginalSteps,
   formatMoney,
