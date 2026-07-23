@@ -67,11 +67,21 @@ async function resolveOne(film: FilmInput, apiKey: string): Promise<TmdbRef | nu
   let ref: TmdbRef | null = null;
   const params = new URLSearchParams({ api_key: apiKey, query: film.title });
   if (mode === 'multi') {
-    // /multi ignores a year filter, so don't set one; take the first movie/tv hit.
+    // /multi carries no year query param, so keep the year signal by filtering
+    // its results: prefer the movie/TV hit whose release/first-air year matches
+    // the import (disambiguates remakes and movie-vs-series-of-same-name), and
+    // only fall back to TMDb's top-ranked hit when no year matches.
     const res = await fetch(`${TMDB}/search/multi?${params.toString()}`, { headers });
     if (!res.ok) return null;
-    const data = (await res.json()) as { results?: Array<{ id?: number; media_type?: string }> };
-    const hit = data.results?.find((r) => r.media_type === 'movie' || r.media_type === 'tv');
+    const data = (await res.json()) as {
+      results?: Array<{ id?: number; media_type?: string; release_date?: string; first_air_date?: string }>;
+    };
+    const candidates = (data.results ?? []).filter(
+      (r) => (r.media_type === 'movie' || r.media_type === 'tv') && typeof r.id === 'number',
+    );
+    const yearOf = (r: { release_date?: string; first_air_date?: string }): string =>
+      (r.release_date || r.first_air_date || '').slice(0, 4);
+    const hit = (yearKey && candidates.find((r) => yearOf(r) === yearKey)) || candidates[0];
     if (hit && typeof hit.id === 'number') ref = { mediaType: hit.media_type as MediaType, id: hit.id };
   } else {
     // TV search filters on first_air_date_year, movie search on year.
