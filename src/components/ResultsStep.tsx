@@ -182,7 +182,7 @@ export default function ResultsStep({
               <Line
                 left={<>＋ {s.name}</>}
                 tag={ownedTierFor(region, s.slug, adPolicy)?.ads ? 'With ads' : undefined}
-                count={`+${s.addFilms} films`}
+                count={`+${s.addFilms} titles`}
                 price={formatMoney(s.addCost)}
                 leaderColor="var(--lime-leader)"
                 countColor="var(--lime)"
@@ -197,7 +197,7 @@ export default function ResultsStep({
             <div style={perf} />
             <p style={groupLabel('var(--text-dimmer)')}>IF YOU WANT MORE</p>
             <p style={{ fontSize: 11.5, color: 'var(--text-dim)', margin: '-6px 0 8px' }}>
-              Optional — each adds fewer films for more money.
+              Optional — each adds fewer titles for more money.
             </p>
             {moreSteps.map((s) => (
               <Line
@@ -227,7 +227,7 @@ export default function ResultsStep({
                   </span>
                 }
                 tag={f.kind === 'free-library' ? 'library' : 'free · ads'}
-                count={`${f.coveredCount} films`}
+                count={`${f.coveredCount} titles`}
                 price="$0.00"
                 nameColor="var(--text-2)"
               />
@@ -239,7 +239,7 @@ export default function ResultsStep({
                   key={o.slug}
                   left={<>● {serviceLabel(region, o.slug)}</>}
                   tag={tier?.label}
-                  count={`${o.coveredCount} films`}
+                  count={`${o.coveredCount} titles`}
                   price={formatMoney(tier?.monthly ?? 0)}
                   nameColor="var(--text-2)"
                 />
