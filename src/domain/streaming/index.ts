@@ -14,7 +14,9 @@
  */
 
 export * from './catalog.js';
+export type { MediaType, TmdbRef } from '../media.js';
 
+import type { MediaType } from '../media.js';
 import {
   SERVICES,
   serviceBySlug,
@@ -25,13 +27,17 @@ import {
   type TierPolicy,
 } from './catalog.js';
 
-/** A watchlist film + the raw TMDb provider_ids that stream it (any bucket). */
+/** A watchlist title + the raw TMDb provider_ids that stream it (any bucket). */
 export type StreamingFilm = {
   /** Stable identity (the shared filmKey). */
   key: string;
   title: string;
   /** Raw TMDb provider_ids (flatrate ∪ free ∪ ads), canonicalized internally. */
   providerIds: number[];
+  /** 'movie' | 'tv' when resolved. Display metadata only — the optimizer is
+   *  media-agnostic (it works purely on provider ids), so this never affects
+   *  the recommendation; it only lets the UI show the movie/show mix. */
+  mediaType?: MediaType;
 };
 
 export type OptimizeOptions = {
@@ -100,6 +106,9 @@ export type CreditedService = { slug: string; name: string; coveredCount: number
 export type StreamingResult = {
   region: Region;
   totalFilms: number;
+  /** How many of the titles are TV shows (mediaType === 'tv'). 0 for an all-
+   *  movie watchlist; lets the receipt surface the movie/show mix. */
+  tvCount: number;
   /** Films watchable on at least one AVAILABLE service (free or paid). */
   coverableCount: number;
   /** Cost-vs-coverage Pareto frontier of paid combos, ascending by cost. */
@@ -369,6 +378,7 @@ export function optimizeStreaming(
   return {
     region,
     totalFilms: films.length,
+    tvCount: films.reduce((n, f) => n + (f.mediaType === 'tv' ? 1 : 0), 0),
     coverableCount: coverableKeys.size,
     frontier,
     marginalPath,

@@ -34,7 +34,7 @@ describe('explain formatters', () => {
 
   it('describeRecommended names services + coverage of the recommended combo', () => {
     const result = optimizeStreaming([film('a', [NETFLIX]), film('b', [NETFLIX])], { region: 'US' });
-    expect(describeRecommended(result)).toMatch(/Netflix cover 2 of 2 films for \$7\.99\/mo\./);
+    expect(describeRecommended(result)).toMatch(/Netflix cover 2 of 2 titles for \$7\.99\/mo\./);
   });
 
   it('describeRecommended handles the owned-only / nothing-to-add case', () => {

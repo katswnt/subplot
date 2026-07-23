@@ -1,19 +1,26 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getCached, setCached, CACHE_KEYS, CACHE_DURATION } from './_lib/redis.js';
 import { sendError, sendValidationError, setCors, parseJsonBody } from './_lib/http.js';
-import { validate, array, number, string } from './_lib/validate.js';
+import { validate, array, number, string, oneOf } from './_lib/validate.js';
 import { mapPool } from './_lib/pool.js';
 
 /**
- * Subplot — per-film streaming availability from TMDb watch/providers.
+ * Subplot — per-title streaming availability from TMDb watch/providers.
  *
+ * Takes media-typed refs so movies hit /movie/{id} and shows hit /tv/{id}.
  * Provider data is universal (region-scoped, not per-user) → Redis-cached per
- * (region, tmdbId) for a strong cross-user hit rate. We surface every watch
- * bucket TMDb exposes: `flatrate` (subscription), `free` (no-cost, e.g. Kanopy/
- * Hoopla), `ads` (free-with-ads, e.g. Tubi/Pluto), and `rent`/`buy` (V2 pricing).
+ * (region, mediaType, id) for a strong cross-user hit rate. The mediaType in the
+ * key is load-bearing: movie 1399 and TV 1399 are different titles. We surface
+ * every watch bucket TMDb exposes: `flatrate` (subscription), `free` (no-cost,
+ * e.g. Kanopy/Hoopla), `ads` (free-with-ads, e.g. Tubi/Pluto), and `rent`/`buy`.
  *
  * Data by JustWatch, surfaced via TMDb — attribute JustWatch in the UI.
  */
+
+// Mirrors src/domain/media.ts — the server tsconfig can't import from src.
+type MediaType = 'movie' | 'tv';
+type TmdbRef = { mediaType: MediaType; id: number };
+const refKey = (r: TmdbRef): string => `${r.mediaType}:${r.id}`;
 
 const TMDB = 'https://api.themoviedb.org/3';
 const MAX_IDS = 600;
@@ -47,12 +54,12 @@ const mapOffers = (offers?: TmdbOffer[]): WatchProvider[] =>
       logoPath: o.logo_path || undefined,
     }));
 
-async function fetchProviders(id: number, region: string, apiKey: string): Promise<FilmProviders | null> {
-  const cacheKey = `${CACHE_KEYS.WATCH_PROVIDERS}${region}:${id}`;
+async function fetchProviders(ref: TmdbRef, region: string, apiKey: string): Promise<FilmProviders | null> {
+  const cacheKey = `${CACHE_KEYS.WATCH_PROVIDERS}${region}:${ref.mediaType}:${ref.id}`;
   const cached = await getCached<FilmProviders>(cacheKey);
   if (cached) return cached;
 
-  const url = `${TMDB}/movie/${id}/watch/providers?api_key=${apiKey}`;
+  const url = `${TMDB}/${ref.mediaType}/${ref.id}/watch/providers?api_key=${apiKey}`;
   const res = await fetch(url, { headers: { Accept: 'application/json' } });
   if (!res.ok) return null;
   const data = (await res.json()) as { results?: Record<string, TmdbRegion> };
@@ -77,8 +84,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const body = parseJsonBody(req);
   if (!body) return sendError(req, res, 400, 'invalid_json', 'Request body must be JSON.');
 
+  const refValidator = (value: unknown) =>
+    validate<TmdbRef>(value, {
+      mediaType: oneOf(['movie', 'tv'] as const),
+      id: number({ integer: true, min: 1 }),
+    });
+
   const result = validate(body, {
-    tmdbIds: array(number({ integer: true, min: 1 }), { maxLength: MAX_IDS }),
+    refs: array(refValidator, { maxLength: MAX_IDS }),
     region: string({ pattern: /^[A-Z]{2}$/ }),
   });
   if (!result.ok) return sendValidationError(req, res, result.issues);
@@ -86,16 +99,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const apiKey = process.env.TMDB_API_KEY;
   if (!apiKey) return sendError(req, res, 400, 'tmdb_api_key_required', 'TMDb API key required.');
 
-  const { tmdbIds, region } = result.value;
-  // De-dupe ids so repeated films cost one TMDb call.
-  const uniqueIds = [...new Set(tmdbIds)];
+  const { refs, region } = result.value;
+  // De-dupe by ref key so a title on the list twice costs one TMDb call.
+  const uniqueRefs = [...new Map(refs.map((r) => [refKey(r), r])).values()];
 
   try {
-    const fetched = await mapPool(uniqueIds, 8, (id) => fetchProviders(id, region, apiKey));
-    const providers: Record<number, FilmProviders> = {};
-    uniqueIds.forEach((id, i) => {
+    const fetched = await mapPool(uniqueRefs, 8, (ref) => fetchProviders(ref, region, apiKey));
+    const providers: Record<string, FilmProviders> = {};
+    uniqueRefs.forEach((ref, i) => {
       const p = fetched[i];
-      if (p) providers[id] = p;
+      if (p) providers[refKey(ref)] = p;
     });
     return res.status(200).json({ region, providers });
   } catch (err: unknown) {

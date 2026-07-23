@@ -7,6 +7,7 @@ import {
 } from '@subplot/api-client'
 import type { StreamingFilm } from '@subplot/domain/streaming'
 import type { ImportedFilm } from '@subplot/domain/imports'
+import { tmdbRefKey, type TmdbRef } from '../domain/media.js'
 
 // The result of the (expensive, once-per-region) network stage. Once we hold
 // these, optimizeStreaming is pure + instant, so the results screen can re-run
@@ -78,10 +79,11 @@ export async function resolveWatchlist(
     imdbId: f.imdbId,
     title: f.title,
     year: f.year,
+    mediaType: f.mediaType,
   }))
 
-  // Stage 1 — resolve to TMDb ids (chunked).
-  const keyToTmdb: Record<string, number> = {}
+  // Stage 1 — resolve to TMDb refs (chunked).
+  const keyToRef: Record<string, TmdbRef> = {}
   let unresolvedCount = 0
   const resolveBatches = chunk(resolveInput, CHUNK_SIZE)
   onProgress?.({ stage: 'resolving', completed: 0, total: resolveBatches.length })
@@ -93,18 +95,19 @@ export async function resolveWatchlist(
   })
   for (const r of resolveChunks) {
     if (!r.ok) return { ok: false, error: r.failure.error.message }
-    Object.assign(keyToTmdb, r.data.resolved)
+    Object.assign(keyToRef, r.data.resolved)
     unresolvedCount += r.data.unresolved.length
   }
 
-  const tmdbIds = [...new Set(Object.values(keyToTmdb))]
+  // Unique refs to price — de-duped by ref key (movie 1399 ≠ tv 1399).
+  const uniqueRefs = [...new Map(Object.values(keyToRef).map((r) => [tmdbRefKey(r), r])).values()]
 
-  // Stage 2 — subscription availability per TMDb id (chunked). Availability is
-  // product-critical: a failed chunk must fail the run rather than making films
+  // Stage 2 — subscription availability per TMDb ref (chunked). Availability is
+  // product-critical: a failed chunk must fail the run rather than making titles
   // look unavailable and turning an upstream error into a false recommendation.
-  const providersById: Record<number, FilmProviders> = {}
-  if (tmdbIds.length > 0) {
-    const wpBatches = chunk(tmdbIds, CHUNK_SIZE)
+  const providersByRefKey: Record<string, FilmProviders> = {}
+  if (uniqueRefs.length > 0) {
+    const wpBatches = chunk(uniqueRefs, CHUNK_SIZE)
     onProgress?.({ stage: 'availability', completed: 0, total: wpBatches.length })
     let wpDone = 0
     const wpChunks = await mapLimit(wpBatches, CHUNK_CONCURRENCY, async (batch) => {
@@ -114,14 +117,14 @@ export async function resolveWatchlist(
     })
     for (const w of wpChunks) {
       if (!w.ok) return { ok: false, error: w.failure.error.message }
-      Object.assign(providersById, w.data.providers)
+      Object.assign(providersByRefKey, w.data.providers)
     }
   }
 
   const streamingFilms: StreamingFilm[] = films.map((f) => {
-    const tmdbId = keyToTmdb[f.key]
-    const providers = tmdbId != null ? providersById[tmdbId] : undefined
-    // Union every bucket a film can be watched in — subscription (flatrate),
+    const ref = keyToRef[f.key]
+    const providers = ref ? providersByRefKey[tmdbRefKey(ref)] : undefined
+    // Union every bucket a title can be watched in — subscription (flatrate),
     // free (Kanopy/Hoopla), and free-with-ads (Tubi/Pluto). The catalog decides
     // which are free vs paid; the optimizer canonicalizes the raw ids.
     const providerIds = [
@@ -129,7 +132,9 @@ export async function resolveWatchlist(
       ...(providers?.free ?? []),
       ...(providers?.ads ?? []),
     ].map((p) => p.providerId)
-    return { key: f.key, title: f.title, providerIds }
+    // Prefer the media type TMDb confirmed (covers Letterboxd rows resolved via
+    // /search/multi); fall back to the import hint for unresolved titles.
+    return { key: f.key, title: f.title, providerIds, mediaType: ref?.mediaType ?? f.mediaType }
   })
 
   return { ok: true, streamingFilms, unresolvedCount }

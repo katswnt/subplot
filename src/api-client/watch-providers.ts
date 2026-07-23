@@ -1,9 +1,11 @@
 import { apiRequest } from './request.js';
 import type { ApiClientConfig, ApiResult } from './types.js';
+import type { TmdbRef } from '../domain/media.js';
 
 /**
- * Subplot — fetch per-film streaming availability from TMDb watch/providers.
+ * Subplot — fetch per-title streaming availability from TMDb watch/providers.
  *
+ * Takes media-typed refs (movie/tv) so each hits the right TMDb endpoint.
  * Provider data is universal (not per-user) → aggressively Redis-cached server
  * side. MVP consumes `flatrate` (subscription) for the combo optimizer; `rent`
  * and `buy` are carried through for V2 (rent/buy pricing).
@@ -32,16 +34,18 @@ export type FilmProviders = {
 
 export type WatchProvidersResponse = {
   region: string;
-  /** TMDb id → its providers in the region (omitted when TMDb has none). */
-  providers: Record<number, FilmProviders>;
+  /** tmdbRefKey (`movie:1399`) → its providers in the region (omitted when TMDb
+   *  has none). Keyed by ref, not bare id, so movie 1399 and TV 1399 never
+   *  collide. */
+  providers: Record<string, FilmProviders>;
 };
 
 export const getWatchProviders = async (
   config: ApiClientConfig,
-  tmdbIds: number[],
+  refs: TmdbRef[],
   region: string,
 ): Promise<ApiResult<WatchProvidersResponse>> =>
   apiRequest<WatchProvidersResponse>(config, '/api/watch-providers', {
     method: 'POST',
-    body: { tmdbIds, region },
+    body: { refs, region },
   });

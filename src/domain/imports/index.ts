@@ -10,6 +10,7 @@
  * app uses Papa Parse elsewhere; the domain layer must not depend on it).
  */
 import { filmKey } from "../film-key.js";
+import type { MediaType } from "../media.js";
 
 export type ImportSource = "letterboxd" | "imdb" | "unknown";
 
@@ -22,6 +23,10 @@ export type ImportedFilm = {
   letterboxdUri?: string;
   /** Resolved later (TMDb /find or /search). */
   tmdbId?: number;
+  /** 'movie' | 'tv' when the source tells us (IMDb "Title Type"). Left unset
+   *  for Letterboxd rows — Letterboxd carries no type signal, so resolution
+   *  discovers it via TMDb /search/multi. */
+  mediaType?: MediaType;
   /** Shared film identity key (dedup). */
   key: string;
 };
@@ -29,7 +34,7 @@ export type ImportedFilm = {
 export type ParseResult = {
   source: ImportSource;
   films: ImportedFilm[];
-  /** Rows dropped as non-film (TV series/episodes) or unparseable. */
+  /** Rows dropped as non-title (episodes/podcasts), unparseable, or duplicate. */
   skipped: number;
 };
 
@@ -77,9 +82,17 @@ export function detectSource(headers: readonly string[]): ImportSource {
   return "unknown";
 }
 
-const isFilmType = (titleType: string): boolean =>
-  // IMDb "Title Type": keep films, drop episodic TV.
-  !/series|episode/i.test(titleType);
+/** Map an IMDb "Title Type" to a TMDb media type, or null to drop the row.
+ *  IMDb episodic-series types (tvSeries, tvMiniSeries) resolve against TMDb's
+ *  /tv endpoints; everything else (movie, tvMovie, tvSpecial, short, video, …)
+ *  is a /movie. Single episodes and podcasts aren't watchlist titles worth
+ *  optimizing on, so they're the only rows we still drop. */
+const imdbMediaType = (titleType: string): MediaType | null => {
+  const t = titleType.toLowerCase();
+  if (t.includes("episode") || t.includes("podcast")) return null;
+  if (t.includes("series")) return "tv"; // tvSeries, tvMiniSeries
+  return "movie";
+};
 
 /** Parse a raw watchlist CSV (Letterboxd or IMDb) into normalized films. */
 export function parseWatchlist(csvText: string): ParseResult {
@@ -106,9 +119,10 @@ export function parseWatchlist(csvText: string): ParseResult {
       const year = row["Year"] || "";
       const imdbId = (row["Const"] || "").trim();
       const titleType = row["Title Type"] || "";
-      if (!title || !isFilmType(titleType)) { skipped++; continue; }
-      const key = filmKey({ name: title, year });
-      imported = { title, year, imdbId: imdbId || undefined, key };
+      const mediaType = imdbMediaType(titleType);
+      if (!title || mediaType === null) { skipped++; continue; }
+      const key = filmKey({ name: title, year, mediaType });
+      imported = { title, year, imdbId: imdbId || undefined, mediaType, key };
     } else {
       skipped++;
       continue;

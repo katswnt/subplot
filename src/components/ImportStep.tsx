@@ -71,8 +71,8 @@ export default function ImportStep({ onImported }: Props) {
           The cheapest way to watch your watchlist.
         </h1>
         <p style={{ fontSize: 15, lineHeight: 1.55, color: 'var(--text-muted)', margin: 0 }}>
-          Drop your export. Subplot prices every film against the services you can actually subscribe to,
-          then finds the lowest-cost combination that covers the most of it.
+          Drop your export. Subplot prices every title — films and TV shows — against the services you can
+          actually subscribe to, then finds the lowest-cost combination that covers the most of it.
         </p>
       </div>
 
@@ -187,7 +187,8 @@ export default function ImportStep({ onImported }: Props) {
             </p>
             <p style={{ margin: 0 }}>
               <strong style={{ color: 'var(--text-2)' }}>IMDb:</strong> open your Watchlist → the ••• menu (top
-              right) → “Export”. IMDb emails you a CSV, or downloads it directly. Upload that file.
+              right) → “Export”. IMDb emails you a CSV, or downloads it directly. Upload that file — TV shows
+              come along too.
             </p>
           </div>
         </details>

@@ -21,6 +21,16 @@ tt3783958,2024-02-10,2024-02-10,,La La Land,https://www.imdb.com/title/tt3783958
 tt0903747,2024-03-01,2024-03-01,,Breaking Bad,https://www.imdb.com/title/tt0903747/,tvSeries,9.5,49,2008,"Crime, Drama, Thriller",2000000,2008-01-20,
 `;
 
+// IMDb export exercising every Title Type we classify or drop.
+const IMDB_TYPES_CSV = `Const,Title,Title Type,Year
+tt0000001,A Movie,movie,2020
+tt0000002,A Mini,tvMiniSeries,2019
+tt0000003,A Series,tvSeries,2015
+tt0000004,A TV Movie,tvMovie,2011
+tt0000005,An Episode,tvEpisode,2015
+tt0000006,A Podcast,podcastSeries,2022
+`;
+
 test("parseCsv handles quoted fields with embedded commas", () => {
   const rows = parseCsv(`a,b,c
 1,"hello, world",3
@@ -54,16 +64,47 @@ test("parses a Letterboxd watchlist into normalized films", () => {
   assert.ok(eeaao.key, "every film has a dedup key");
 });
 
-test("parses an IMDb watchlist and carries the tconst, dropping TV series", () => {
+test("parses an IMDb watchlist, keeping TV series with a media type", () => {
   const { source, films, skipped } = parseWatchlist(IMDB_CSV);
   assert.equal(source, "imdb");
-  // Breaking Bad (tvSeries) is filtered out → 2 films, 1 skipped.
-  assert.equal(films.length, 2);
-  assert.equal(skipped, 1);
+  // Breaking Bad (tvSeries) is now kept → 3 titles, 0 skipped.
+  assert.equal(films.length, 3);
+  assert.equal(skipped, 0);
   const parasite = films.find((f) => f.title === "Parasite") as ImportedFilm;
   assert.equal(parasite.imdbId, "tt6751668");
   assert.equal(parasite.year, "2019");
+  assert.equal(parasite.mediaType, "movie");
   assert.equal(parasite.letterboxdUri, undefined);
+  const bb = films.find((f) => f.title === "Breaking Bad") as ImportedFilm;
+  assert.equal(bb.mediaType, "tv");
+});
+
+test("classifies IMDb Title Types into movie/tv and drops episodes/podcasts", () => {
+  const { films, skipped } = parseWatchlist(IMDB_TYPES_CSV);
+  const byTitle = Object.fromEntries(films.map((f) => [f.title, f.mediaType]));
+  // Series types → tv.
+  assert.equal(byTitle["A Mini"], "tv");
+  assert.equal(byTitle["A Series"], "tv");
+  // movie + tvMovie → movie (tvMovies live on TMDb's /movie endpoint).
+  assert.equal(byTitle["A Movie"], "movie");
+  assert.equal(byTitle["A TV Movie"], "movie");
+  // Single episodes and podcasts are dropped, not emitted.
+  assert.equal(byTitle["An Episode"], undefined);
+  assert.equal(byTitle["A Podcast"], undefined);
+  assert.equal(films.length, 4);
+  assert.equal(skipped, 2);
+});
+
+test("a same-name, same-year movie and show get distinct keys", () => {
+  // Two rows that would collide on ty:name|year without a media-type namespace.
+  const csv = `Const,Title,Title Type,Year
+tt1000001,Fargo,movie,2014
+tt1000002,Fargo,tvSeries,2014
+`;
+  const { films, skipped } = parseWatchlist(csv);
+  assert.equal(films.length, 2, "movie and show must not dedupe together");
+  assert.equal(skipped, 0);
+  assert.notEqual(films[0].key, films[1].key);
 });
 
 test("dedupes repeated films within one import", () => {

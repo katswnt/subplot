@@ -7,12 +7,16 @@
  * slug, then a normalized title|year. Same film → same key everywhere.
  */
 import { canonicalizeLetterboxdUri } from "./canonical-uri.js";
+import type { MediaType } from "./media.js";
 
 export type FilmKeyInput = {
   tmdbId?: number | null;
   uri?: string | null;
   name?: string | null;
   year?: string | number | null;
+  /** When known, namespaces the title|year fallback so a same-name, same-year
+   *  movie and TV show never dedupe into one entry. */
+  mediaType?: MediaType | null;
 };
 
 /** The Letterboxd film slug from a URI (canonicalized), or "" when absent. */
@@ -32,7 +36,9 @@ export function filmKey(f: FilmKeyInput, uriMap?: Record<string, string> | null)
   if (slug) return `slug:${slug}`;
   const name = (f.name ?? "").toString().trim().toLowerCase();
   const year = (f.year ?? "").toString().trim();
-  return name ? `ty:${name}|${year}` : "";
+  if (!name) return "";
+  const mt = f.mediaType ? `${f.mediaType}:` : "";
+  return `ty:${mt}${name}|${year}`;
 }
 
 /** Extract a FilmKeyInput from an enriched-movie-shaped object. */

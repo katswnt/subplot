@@ -264,3 +264,15 @@ test("library toggle gates Kanopy/Hoopla from the free baseline", () => {
   assert.equal(off.freeCoveredCount, 0);
   assert.equal(off.orphans.length, 1); // no card → nowhere to watch it free
 });
+
+test("tvCount tallies TV titles; movies and untyped titles don't count", () => {
+  const films: StreamingFilm[] = [
+    { key: "a", title: "Dune", providerIds: [MAX], mediaType: "movie" },
+    { key: "b", title: "The Bear", providerIds: [NETFLIX], mediaType: "tv" },
+    { key: "c", title: "Severance", providerIds: [NETFLIX], mediaType: "tv" },
+    { key: "d", title: "Untyped", providerIds: [NETFLIX] },
+  ];
+  const r = optimizeStreaming(films, { region: "US" });
+  assert.equal(r.totalFilms, 4);
+  assert.equal(r.tvCount, 2);
+});

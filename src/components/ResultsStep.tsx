@@ -146,7 +146,7 @@ export default function ResultsStep({
             }}
           >
             <p style={{ ...mono, fontSize: 12.5, margin: 0, color: 'var(--lime)', fontWeight: 600 }}>
-              {result.freeCoveredCount} FILMS FREE · $0.00
+              {result.freeCoveredCount} TITLES FREE · $0.00
             </p>
             <p style={{ ...mono, fontSize: 11, margin: '3px 0 0', color: 'var(--text-dim)' }}>
               already streaming on {freeTeaser}
@@ -253,7 +253,7 @@ export default function ResultsStep({
         <div style={{ display: 'flex', justifyContent: 'space-between', ...mono, fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>
           <span>COVERED</span>
           <span data-testid="coverage">
-            {rec.coveredCount} / {total} films
+            {rec.coveredCount} / {total} titles
           </span>
         </div>
         <div style={{ display: 'flex', height: 9, borderRadius: 999, background: 'var(--border-12)', overflow: 'hidden' }}>
@@ -264,9 +264,15 @@ export default function ResultsStep({
           <span><span style={{ color: '#7cc93d' }}>■</span> free / included</span>
           <span><span style={{ color: 'var(--lime)' }}>■</span> added</span>
         </div>
+        {result.tvCount > 0 && (
+          <p style={{ ...mono, fontSize: 10.5, color: 'var(--text-dim)', margin: '8px 0 0' }} data-testid="media-mix">
+            {total - result.tvCount} {total - result.tvCount === 1 ? 'film' : 'films'} · {result.tvCount}{' '}
+            {result.tvCount === 1 ? 'TV show' : 'TV shows'}
+          </p>
+        )}
         {(result.orphans.length > 0 || unresolvedCount > 0) && (
           <p style={{ ...mono, fontSize: 11, color: 'var(--text-dimmer)', margin: '10px 0 0' }} data-testid="orphans-note">
-            {result.orphans.length > 0 && `${result.orphans.length} films rent/buy only`}
+            {result.orphans.length > 0 && `${result.orphans.length} titles rent/buy only`}
             {result.orphans.length > 0 && unresolvedCount > 0 && ' · '}
             {unresolvedCount > 0 && `${unresolvedCount} unmatched, skipped`}
           </p>

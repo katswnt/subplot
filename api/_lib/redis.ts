@@ -77,10 +77,12 @@ export async function setCached(key: string, value: unknown, expiresInSeconds?: 
 }
 
 // Subplot cache-key namespace (shares the Redis instance with Letterbddy).
+// v2 resolve / v3 wp: cached values are now media-typed refs, and provider keys
+// carry the media type — bumped so a pre-TV bare-id entry is never misread.
 export const CACHE_KEYS = {
-  RESOLVE_IMDB: 'subplot:resolve:v1:imdb:',
-  RESOLVE_SEARCH: 'subplot:resolve:v1:search:',
-  WATCH_PROVIDERS: 'subplot:wp:v2:', // v2: include free + ads buckets
+  RESOLVE_IMDB: 'subplot:resolve:v2:imdb:',
+  RESOLVE_SEARCH: 'subplot:resolve:v2:search:',
+  WATCH_PROVIDERS: 'subplot:wp:v3:', // v3: keyed by (region, mediaType, id)
 } as const;
 
 export const CACHE_DURATION = {
