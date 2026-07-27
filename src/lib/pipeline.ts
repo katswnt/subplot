@@ -3,6 +3,7 @@ import {
   getWatchProviders,
   type ApiClientConfig,
   type ResolveFilmInput,
+  type ResolveMatch,
   type FilmProviders,
 } from '@subplot/api-client'
 import type { StreamingFilm } from '@subplot/domain/streaming'
@@ -61,19 +62,27 @@ async function mapLimit<T, R>(
   return out
 }
 
-/**
- * The network stage: resolve imported films to TMDb ids and fetch their watch
- * availability (region-scoped), producing the raw provider-id map each film can
- * be watched through. Both sub-stages are chunked so watchlists of any size work.
- * Optimization (which combo to recommend) happens separately + purely downstream.
- */
-export async function resolveWatchlist(
-  films: ImportedFilm[],
-  region: string,
-  onProgress?: ProgressFn,
-): Promise<ResolveOutcome> {
-  const cfg = apiConfig()
+// Stage 1 alone — resolve titles to TMDb refs + display info, WITHOUT fetching
+// availability. The review step sits between: resolve, let the user confirm the
+// uncertain matches, THEN price only the confirmed set.
+export type ResolveTitlesOutcome =
+  | {
+      ok: true
+      /** filmKey → matched title's display info (title/year/poster), for review. */
+      matches: Record<string, ResolveMatch>
+      /** filmKey → TMDb ref, for every title that resolved. */
+      keyToRef: Record<string, TmdbRef>
+      /** filmKeys that resolved to nothing. */
+      unresolvedKeys: string[]
+    }
+  | { ok: false; error: string }
 
+/** Stage 1: resolve imported titles to TMDb refs + display info (chunked). */
+export async function resolveTitles(
+  films: ImportedFilm[],
+  onProgress?: ProgressFn,
+): Promise<ResolveTitlesOutcome> {
+  const cfg = apiConfig()
   const resolveInput: ResolveFilmInput[] = films.map((f) => ({
     key: f.key,
     imdbId: f.imdbId,
@@ -82,9 +91,9 @@ export async function resolveWatchlist(
     mediaType: f.mediaType,
   }))
 
-  // Stage 1 — resolve to TMDb refs (chunked).
   const keyToRef: Record<string, TmdbRef> = {}
-  let unresolvedCount = 0
+  const matches: Record<string, ResolveMatch> = {}
+  const unresolvedKeys: string[] = []
   const resolveBatches = chunk(resolveInput, CHUNK_SIZE)
   onProgress?.({ stage: 'resolving', completed: 0, total: resolveBatches.length })
   let resolveDone = 0
@@ -96,15 +105,30 @@ export async function resolveWatchlist(
   for (const r of resolveChunks) {
     if (!r.ok) return { ok: false, error: r.failure.error.message }
     Object.assign(keyToRef, r.data.resolved)
-    unresolvedCount += r.data.unresolved.length
+    Object.assign(matches, r.data.matches)
+    unresolvedKeys.push(...r.data.unresolved)
   }
+  return { ok: true, matches, keyToRef, unresolvedKeys }
+}
+
+/**
+ * Stage 2: fetch subscription availability for the given films' refs and build
+ * the raw provider-id map per film. Takes a (possibly review-filtered) film set
+ * and its resolved refs. Availability is product-critical: a failed chunk must
+ * fail the run rather than making titles look unavailable and turning an
+ * upstream error into a false recommendation.
+ */
+export async function fetchAvailability(
+  films: ImportedFilm[],
+  keyToRef: Record<string, TmdbRef>,
+  region: string,
+  onProgress?: ProgressFn,
+): Promise<ResolveOutcome> {
+  const cfg = apiConfig()
 
   // Unique refs to price — de-duped by ref key (movie 1399 ≠ tv 1399).
   const uniqueRefs = [...new Map(Object.values(keyToRef).map((r) => [tmdbRefKey(r), r])).values()]
 
-  // Stage 2 — subscription availability per TMDb ref (chunked). Availability is
-  // product-critical: a failed chunk must fail the run rather than making titles
-  // look unavailable and turning an upstream error into a false recommendation.
   const providersByRefKey: Record<string, FilmProviders> = {}
   if (uniqueRefs.length > 0) {
     const wpBatches = chunk(uniqueRefs, CHUNK_SIZE)
@@ -137,5 +161,21 @@ export async function resolveWatchlist(
     return { key: f.key, title: f.title, providerIds, mediaType: ref?.mediaType ?? f.mediaType }
   })
 
+  const unresolvedCount = films.filter((f) => !keyToRef[f.key]).length
   return { ok: true, streamingFilms, unresolvedCount }
+}
+
+/**
+ * The full network stage: resolve then price, in one call. Kept for the
+ * no-review path (and existing callers/tests) — equivalent to resolveTitles
+ * followed by fetchAvailability over the same film set.
+ */
+export async function resolveWatchlist(
+  films: ImportedFilm[],
+  region: string,
+  onProgress?: ProgressFn,
+): Promise<ResolveOutcome> {
+  const resolved = await resolveTitles(films, onProgress)
+  if (!resolved.ok) return { ok: false, error: resolved.error }
+  return fetchAvailability(films, resolved.keyToRef, region, onProgress)
 }
