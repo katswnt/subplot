@@ -7,7 +7,7 @@ import ResultsStep from './components/ResultsStep'
 import ReviewStep from './components/ReviewStep'
 import { resolveTitles, fetchAvailability, type PipelineProgress } from './lib/pipeline'
 import { buildReviewSummary, type ReviewSummary } from '@subplot/domain/review'
-import type { ResolveMatch } from '@subplot/api-client'
+import { searchTitles, type ResolveMatch, type SearchCandidate } from '@subplot/api-client'
 import type { TmdbRef } from './domain/media'
 
 type Phase = 'import' | 'configure' | 'working' | 'review' | 'results'
@@ -179,12 +179,29 @@ export default function App() {
     setPhase('review')
   }
 
-  // From the review step: drop the skipped (+ unmatched) keys, then price the rest.
-  const confirmReview = async (excludedKeys: string[]) => {
+  // Free-text search for the review "find the right one" picker.
+  const searchForTitle = async (query: string): Promise<SearchCandidate[]> => {
+    const r = await searchTitles(
+      { baseUrl: typeof window !== 'undefined' ? window.location.origin : '' },
+      query,
+    )
+    return r.ok ? r.data.candidates : []
+  }
+
+  // From the review step: drop the skipped keys, fold in user-picked matches
+  // (which give real refs to previously-unmatched titles), then price the rest.
+  const confirmReview = async (
+    excludedKeys: string[],
+    overrides: Record<string, SearchCandidate>,
+  ) => {
     if (!resolveData) return
+    const keyToRef: Record<string, TmdbRef> = { ...resolveData.keyToRef }
+    for (const [key, cand] of Object.entries(overrides)) {
+      keyToRef[key] = { mediaType: cand.mediaType, id: cand.id }
+    }
     const excluded = new Set(excludedKeys)
     const kept = films.filter((f) => !excluded.has(f.key))
-    await priceAndReveal(kept, resolveData.keyToRef)
+    await priceAndReveal(kept, keyToRef)
   }
 
   const startOver = () => {
@@ -291,6 +308,7 @@ export default function App() {
           matches={resolveData.matches}
           importedTitleByKey={Object.fromEntries(films.map((f) => [f.key, f.title]))}
           confidentCount={reviewSummary.confidentCount}
+          onSearch={searchForTitle}
           onConfirm={confirmReview}
           onBack={() => {
             setReviewSummary(null)

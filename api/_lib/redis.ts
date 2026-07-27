@@ -82,6 +82,7 @@ export async function setCached(key: string, value: unknown, expiresInSeconds?: 
 export const CACHE_KEYS = {
   RESOLVE_IMDB: 'subplot:resolve:v3:imdb:', // v3: cached value now carries title/year/poster for the review step
   RESOLVE_SEARCH: 'subplot:resolve:v3:search:',
+  SEARCH: 'subplot:search:v1:', // free-text candidate search for the review picker
   WATCH_PROVIDERS: 'subplot:wp:v3:', // v3: keyed by (region, mediaType, id)
 } as const;
 
