@@ -8,6 +8,7 @@ import ResultsStep from '../../src/components/ResultsStep';
 const NETFLIX = 8;
 const MAX = 1899;
 const TUBI = 73;
+const KANOPY = 191;
 const UNPRICED = 999999;
 
 const film = (key: string, providerIds: number[]): StreamingFilm => ({ key, title: key, providerIds });
@@ -44,6 +45,27 @@ describe('ResultsStep receipt', () => {
     render(<ResultsStep {...base} result={result} />);
     expect(screen.getByTestId('free-summary').textContent).toMatch(/2 TITLES FREE/);
     expect(screen.getAllByTestId('free-service').some((c) => /Tubi/.test(c.textContent ?? ''))).toBe(true);
+  });
+
+  it('encodes ads in a marker, not a wrapping inline tag', () => {
+    const films = [film('t1', [TUBI]), film('t2', [TUBI]), film('n1', [NETFLIX])];
+    const result = optimizeStreaming(films, { region: 'US' });
+    const { container } = render(<ResultsStep {...base} result={result} />);
+    // The legacy inline qualifiers are gone from the receipt rows.
+    expect(container.textContent).not.toMatch(/free · ads/);
+    expect(container.textContent).not.toMatch(/With ads/);
+    // The ad markers + their legend are present instead.
+    expect(container.textContent).toMatch(/ad-free/);
+    expect(container.textContent).toContain('◐');
+  });
+
+  it('moves library-card services to a footnote, out of the priced rows', () => {
+    const films = [film('k1', [KANOPY]), film('k2', [KANOPY]), film('n1', [NETFLIX])];
+    const result = optimizeStreaming(films, { region: 'US', includeLibraryFree: true });
+    const { container } = render(<ResultsStep {...base} result={result} />);
+    // Kanopy is credited via a footnote, not a "◐ … $0.00" line item.
+    expect(container.textContent).toMatch(/library card/i);
+    expect(screen.queryAllByTestId('free-service').some((c) => /Kanopy/.test(c.textContent ?? ''))).toBe(false);
   });
 
   it('surfaces the movie/show mix when the watchlist includes TV', () => {

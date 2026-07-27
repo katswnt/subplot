@@ -29,18 +29,28 @@ const groupLabel = (color: string): React.CSSProperties => ({
   margin: '0 0 12px',
 })
 
-/** A receipt line: label … leader … count · price. */
+/**
+ * A receipt line: [marker] name … leader … count · price.
+ *
+ * The ads-vs-ad-free fact lives in a fixed-width marker cell (● ad-free · ◐
+ * with ads) instead of an inline text tag — a tag pushes long names, wraps to a
+ * second line, and collapses the dot leader to a stub. The exact tier name
+ * (Standard / Premium…) rides in `title` so it's reachable on hover/tap without
+ * earning a permanent column the price already implies.
+ */
 function Line({
+  marker,
   left,
-  tag,
+  title,
   count,
   price,
   leaderColor = 'var(--perf)',
   countColor = 'var(--text-dimmer)',
   nameColor = 'var(--text)',
 }: {
+  marker?: React.ReactNode
   left: React.ReactNode
-  tag?: string
+  title?: string
   count?: string
   price: string
   leaderColor?: string
@@ -48,11 +58,15 @@ function Line({
   nameColor?: string
 }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, ...mono, fontSize: 12.5, padding: '5px 0' }}>
-      {/* name + tag wrap together; the name never splits from its ＋/● marker */}
-      <span style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 6, minWidth: 0 }}>
-        <span style={{ color: nameColor, fontWeight: 600, whiteSpace: 'nowrap' }}>{left}</span>
-        {tag && <span style={{ color: 'var(--text-dim)', fontSize: 11, whiteSpace: 'nowrap' }}>{tag}</span>}
+    <div title={title} style={{ display: 'flex', alignItems: 'baseline', gap: 8, ...mono, fontSize: 12.5, padding: '5px 0' }}>
+      {marker != null && (
+        <span aria-hidden="true" style={{ flex: '0 0 auto', width: 13, color: 'var(--text-dim)' }}>
+          {marker}
+        </span>
+      )}
+      {/* name never wraps; the leader takes the slack so the row stays one line */}
+      <span style={{ flex: '0 1 auto', color: nameColor, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        {left}
       </span>
       <span
         style={{ flex: '1 1 12px', minWidth: 12, borderBottom: `1px dotted ${leaderColor}`, transform: 'translateY(-3px)' }}
@@ -68,6 +82,23 @@ function Line({
     </div>
   )
 }
+
+/** Marker key, shown once under a group label that uses ● / ◐ markers. */
+function MarkerLegend() {
+  return (
+    <div style={{ ...mono, display: 'flex', gap: 18, fontSize: 10, color: 'var(--text-faint)', margin: '-6px 0 8px' }}>
+      <span>
+        <span style={{ color: 'var(--text-dim)' }}>●</span> ad-free
+      </span>
+      <span>
+        <span style={{ color: 'var(--text-dim)' }}>◐</span> with ads
+      </span>
+    </div>
+  )
+}
+
+/** ● ad-free · ◐ with ads. */
+const adMarker = (ads: boolean | undefined): string => (ads ? '◐' : '●')
 
 export default function ResultsStep({
   result,
@@ -88,6 +119,11 @@ export default function ResultsStep({
   const added = Math.max(0, rec.coveredCount - included)
   const includedPct = total ? (included / total) * 100 : 0
   const addedPct = total ? (added / total) * 100 : 0
+
+  // Free ad-supported services stay as receipt rows; library-card ones drop to
+  // a footnote (they need a card, so they're conditional, not a flat line item).
+  const freeLibrary = result.free.filter((f) => f.kind === 'free-library')
+  const freeAds = result.free.filter((f) => f.kind !== 'free-library')
 
   const freeNames = result.free.map((f) => serviceLabel(region, f.slug))
   const freeTeaser =
@@ -177,18 +213,25 @@ export default function ResultsStep({
             Nice — your free{owns ? ' and owned' : ''} services already cover everything we can.
           </p>
         ) : (
-          recSteps.map((s) => (
-            <div key={s.slug} data-testid="marginal-step">
-              <Line
-                left={<>＋ {s.name}</>}
-                tag={ownedTierFor(region, s.slug, adPolicy)?.ads ? 'With ads' : undefined}
-                count={`+${s.addFilms} titles`}
-                price={formatMoney(s.addCost)}
-                leaderColor="var(--lime-leader)"
-                countColor="var(--lime)"
-              />
-            </div>
-          ))
+          <>
+            <MarkerLegend />
+            {recSteps.map((s) => {
+              const tier = ownedTierFor(region, s.slug, adPolicy)
+              return (
+                <div key={s.slug} data-testid="marginal-step">
+                  <Line
+                    marker={adMarker(tier?.ads)}
+                    left={<>＋ {s.name}</>}
+                    title={tier?.label}
+                    count={`+${s.addFilms} titles`}
+                    price={formatMoney(s.addCost)}
+                    leaderColor="var(--lime-leader)"
+                    countColor="var(--lime)"
+                  />
+                </div>
+              )
+            })}
+          </>
         )}
 
         {/* IF YOU WANT MORE — de-emphasized via explicit colors, not opacity */}
@@ -199,17 +242,21 @@ export default function ResultsStep({
             <p style={{ fontSize: 11.5, color: 'var(--text-dim)', margin: '-6px 0 8px' }}>
               Optional — each adds fewer titles for more money.
             </p>
-            {moreSteps.map((s) => (
-              <Line
-                key={s.slug}
-                left={<>＋ {s.name}</>}
-                tag={ownedTierFor(region, s.slug, adPolicy)?.ads ? 'With ads' : undefined}
-                count={`+${s.addFilms}`}
-                price={`+${formatMoney(s.addCost)}`}
-                nameColor="var(--text-dim)"
-                countColor="var(--text-dimmer)"
-              />
-            ))}
+            {moreSteps.map((s) => {
+              const tier = ownedTierFor(region, s.slug, adPolicy)
+              return (
+                <Line
+                  key={s.slug}
+                  marker={adMarker(tier?.ads)}
+                  left={<>＋ {s.name}</>}
+                  title={tier?.label}
+                  count={`+${s.addFilms}`}
+                  price={`+${formatMoney(s.addCost)}`}
+                  nameColor="var(--text-dim)"
+                  countColor="var(--text-dimmer)"
+                />
+              )
+            })}
           </>
         )}
 
@@ -218,15 +265,14 @@ export default function ResultsStep({
           <>
             <div style={perf} />
             <p style={groupLabel('var(--text-dimmer)')}>INCLUDED · NO EXTRA COST</p>
-            {result.free.map((f) => (
+            <MarkerLegend />
+            {/* Free ad-supported services are line items; free-with-a-library-card
+                ones (Kanopy/Hoopla) are conditional, so they drop to a footnote. */}
+            {freeAds.map((f) => (
               <Line
                 key={f.slug}
-                left={
-                  <span data-testid="free-service">
-                    ◉ {serviceLabel(region, f.slug)}
-                  </span>
-                }
-                tag={f.kind === 'free-library' ? 'library' : 'free · ads'}
+                marker="◐"
+                left={<span data-testid="free-service">{serviceLabel(region, f.slug)}</span>}
                 count={`${f.coveredCount} titles`}
                 price="$0.00"
                 nameColor="var(--text-2)"
@@ -237,14 +283,20 @@ export default function ResultsStep({
               return (
                 <Line
                   key={o.slug}
-                  left={<>● {serviceLabel(region, o.slug)}</>}
-                  tag={tier?.label}
+                  marker={adMarker(tier?.ads)}
+                  left={serviceLabel(region, o.slug)}
+                  title={tier?.label}
                   count={`${o.coveredCount} titles`}
                   price={formatMoney(tier?.monthly ?? 0)}
                   nameColor="var(--text-2)"
                 />
               )
             })}
+            {freeLibrary.length > 0 && (
+              <p style={{ ...mono, fontSize: 10.5, color: 'var(--text-faint)', margin: '8px 0 0', lineHeight: 1.5 }}>
+                {freeLibrary.map((f) => serviceLabel(region, f.slug)).join(' · ')} — free with a library card
+              </p>
+            )}
           </>
         )}
 
