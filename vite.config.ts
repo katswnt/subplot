@@ -19,6 +19,10 @@ export default defineConfig({
         replacement: path.resolve(__dirname, 'src/domain/review/index.ts'),
       },
       {
+        find: '@subplot/domain/watch',
+        replacement: path.resolve(__dirname, 'src/domain/watch/index.ts'),
+      },
+      {
         find: '@subplot/api-client',
         replacement: path.resolve(__dirname, 'src/api-client/index.ts'),
       },
