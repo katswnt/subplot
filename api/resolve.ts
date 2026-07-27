@@ -20,38 +20,56 @@ import { mapPool } from './_lib/pool.js';
 // src, so the wire contract is re-declared here (as FilmProviders is elsewhere).
 type MediaType = 'movie' | 'tv';
 type TmdbRef = { mediaType: MediaType; id: number };
+/** A resolved title with the display fields the review step shows the user. */
+type ResolveMatch = { mediaType: MediaType; id: number; title: string; year: string; posterPath: string | null };
 
 const TMDB = 'https://api.themoviedb.org/3';
 const MAX_FILMS = 600;
 
 type FilmInput = { key: string; imdbId?: string; title: string; year?: string; mediaType?: MediaType };
 
-async function resolveOne(film: FilmInput, apiKey: string): Promise<TmdbRef | null> {
+// A single TMDb search/find result — movies carry `title`/`release_date`, TV
+// carries `name`/`first_air_date`; `/multi` results also tag `media_type`.
+type TmdbResult = {
+  id?: number;
+  media_type?: string;
+  title?: string;
+  name?: string;
+  release_date?: string;
+  first_air_date?: string;
+  poster_path?: string | null;
+};
+
+const toMatch = (mediaType: MediaType, r: TmdbResult | undefined): ResolveMatch | null => {
+  if (!r || typeof r.id !== 'number') return null;
+  const title = (mediaType === 'tv' ? r.name : r.title) || r.title || r.name || '';
+  const year = (r.release_date || r.first_air_date || '').slice(0, 4);
+  return { mediaType, id: r.id, title, year, posterPath: r.poster_path ?? null };
+};
+
+async function resolveOne(film: FilmInput, apiKey: string): Promise<ResolveMatch | null> {
   const headers: HeadersInit = { Accept: 'application/json' };
 
   // IMDb tconst → /find, which returns both movie_results and tv_results.
   if (film.imdbId && /^tt\d+$/.test(film.imdbId)) {
     const cacheKey = `${CACHE_KEYS.RESOLVE_IMDB}${film.imdbId}`;
-    const cached = await getCached<TmdbRef>(cacheKey);
+    const cached = await getCached<ResolveMatch>(cacheKey);
     if (cached) return cached;
     const url = `${TMDB}/find/${film.imdbId}?external_source=imdb_id&api_key=${apiKey}`;
     const res = await fetch(url, { headers });
     if (!res.ok) return null;
-    const data = (await res.json()) as {
-      movie_results?: Array<{ id?: number }>;
-      tv_results?: Array<{ id?: number }>;
-    };
-    const movieId = data.movie_results?.[0]?.id;
-    const tvId = data.tv_results?.[0]?.id;
+    const data = (await res.json()) as { movie_results?: TmdbResult[]; tv_results?: TmdbResult[] };
+    const movie = data.movie_results?.[0];
+    const tv = data.tv_results?.[0];
     // Prefer the bucket matching the import's media hint; else whichever exists.
-    let ref: TmdbRef | null = null;
-    if (film.mediaType === 'tv' && typeof tvId === 'number') ref = { mediaType: 'tv', id: tvId };
-    else if (film.mediaType === 'movie' && typeof movieId === 'number') ref = { mediaType: 'movie', id: movieId };
-    else if (typeof movieId === 'number') ref = { mediaType: 'movie', id: movieId };
-    else if (typeof tvId === 'number') ref = { mediaType: 'tv', id: tvId };
-    if (ref) {
-      await setCached(cacheKey, ref, CACHE_DURATION.RESOLVE);
-      return ref;
+    let match: ResolveMatch | null = null;
+    if (film.mediaType === 'tv' && tv) match = toMatch('tv', tv);
+    else if (film.mediaType === 'movie' && movie) match = toMatch('movie', movie);
+    else if (movie) match = toMatch('movie', movie);
+    else if (tv) match = toMatch('tv', tv);
+    if (match) {
+      await setCached(cacheKey, match, CACHE_DURATION.RESOLVE);
+      return match;
     }
     return null;
   }
@@ -61,10 +79,10 @@ async function resolveOne(film: FilmInput, apiKey: string): Promise<TmdbRef | nu
   const yearKey = film.year || '';
   const mode: MediaType | 'multi' = film.mediaType ?? 'multi';
   const cacheKey = `${CACHE_KEYS.RESOLVE_SEARCH}${mode}:${film.title.toLowerCase()}|${yearKey}`;
-  const cached = await getCached<TmdbRef>(cacheKey);
+  const cached = await getCached<ResolveMatch>(cacheKey);
   if (cached) return cached;
 
-  let ref: TmdbRef | null = null;
+  let match: ResolveMatch | null = null;
   const params = new URLSearchParams({ api_key: apiKey, query: film.title });
   if (mode === 'multi') {
     // /multi carries no year query param, so keep the year signal by filtering
@@ -73,28 +91,24 @@ async function resolveOne(film: FilmInput, apiKey: string): Promise<TmdbRef | nu
     // only fall back to TMDb's top-ranked hit when no year matches.
     const res = await fetch(`${TMDB}/search/multi?${params.toString()}`, { headers });
     if (!res.ok) return null;
-    const data = (await res.json()) as {
-      results?: Array<{ id?: number; media_type?: string; release_date?: string; first_air_date?: string }>;
-    };
+    const data = (await res.json()) as { results?: TmdbResult[] };
     const candidates = (data.results ?? []).filter(
       (r) => (r.media_type === 'movie' || r.media_type === 'tv') && typeof r.id === 'number',
     );
-    const yearOf = (r: { release_date?: string; first_air_date?: string }): string =>
-      (r.release_date || r.first_air_date || '').slice(0, 4);
+    const yearOf = (r: TmdbResult): string => (r.release_date || r.first_air_date || '').slice(0, 4);
     const hit = (yearKey && candidates.find((r) => yearOf(r) === yearKey)) || candidates[0];
-    if (hit && typeof hit.id === 'number') ref = { mediaType: hit.media_type as MediaType, id: hit.id };
+    if (hit) match = toMatch(hit.media_type as MediaType, hit);
   } else {
     // TV search filters on first_air_date_year, movie search on year.
     if (yearKey) params.set(mode === 'tv' ? 'first_air_date_year' : 'year', yearKey);
     const res = await fetch(`${TMDB}/search/${mode}?${params.toString()}`, { headers });
     if (!res.ok) return null;
-    const data = (await res.json()) as { results?: Array<{ id?: number }> };
-    const id = data.results?.[0]?.id;
-    if (typeof id === 'number') ref = { mediaType: mode, id };
+    const data = (await res.json()) as { results?: TmdbResult[] };
+    match = toMatch(mode, data.results?.[0]);
   }
-  if (ref) {
-    await setCached(cacheKey, ref, CACHE_DURATION.RESOLVE);
-    return ref;
+  if (match) {
+    await setCached(cacheKey, match, CACHE_DURATION.RESOLVE);
+    return match;
   }
   return null;
 }
@@ -125,15 +139,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!apiKey) return sendError(req, res, 400, 'tmdb_api_key_required', 'TMDb API key required.');
 
   try {
-    const refs = await mapPool(result.value.films, 8, (f) => resolveOne(f, apiKey));
+    const found = await mapPool(result.value.films, 8, (f) => resolveOne(f, apiKey));
+    const matches: Record<string, ResolveMatch> = {};
     const resolved: Record<string, TmdbRef> = {};
     const unresolved: string[] = [];
     result.value.films.forEach((film, i) => {
-      const ref = refs[i];
-      if (ref) resolved[film.key] = ref;
-      else unresolved.push(film.key);
+      const match = found[i];
+      if (match) {
+        matches[film.key] = match;
+        resolved[film.key] = { mediaType: match.mediaType, id: match.id };
+      } else {
+        unresolved.push(film.key);
+      }
     });
-    return res.status(200).json({ resolved, unresolved });
+    // `matches` carries the display fields (title/year/poster) the review step
+    // needs; `resolved` stays as the bare-ref map the pipeline consumes today.
+    return res.status(200).json({ resolved, matches, unresolved });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Failed to resolve films.';
     return sendError(req, res, 500, 'resolve_failed', message);

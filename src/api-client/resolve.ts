@@ -21,9 +21,19 @@ export type ResolveFilmInput = {
   mediaType?: MediaType;
 };
 
+/** A resolved title with the display fields the review step shows the user. */
+export type ResolveMatch = TmdbRef & {
+  title: string;
+  year: string;
+  /** TMDb poster path (e.g. "/abc.jpg"), or null. Build a URL with an image base. */
+  posterPath: string | null;
+};
+
 export type ResolveResponse = {
   /** filmKey → TMDb ref, for every title that resolved. */
   resolved: Record<string, TmdbRef>;
+  /** filmKey → the matched title's display info (title/year/poster), for review. */
+  matches: Record<string, ResolveMatch>;
   /** filmKeys that could not be resolved to a TMDb ref. */
   unresolved: string[];
 };

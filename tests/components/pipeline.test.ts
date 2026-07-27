@@ -36,7 +36,7 @@ describe('resolveWatchlist()', () => {
   it('stops when provider availability fails instead of reporting false orphans', async () => {
     api.resolveFilms.mockResolvedValue({
       ok: true,
-      data: { resolved: { 'film:one': { mediaType: 'movie', id: 101 } }, unresolved: [] },
+      data: { resolved: { 'film:one': { mediaType: 'movie', id: 101 } }, matches: {}, unresolved: [] },
     });
     api.getWatchProviders.mockResolvedValue({
       ok: false,
@@ -65,6 +65,7 @@ describe('resolveWatchlist()', () => {
           'ty:the-bear|2022': { mediaType: 'tv', id: 136315 },
           'ty:dune|2021': { mediaType: 'movie', id: 438631 },
         },
+        matches: {},
         unresolved: [],
       },
     });

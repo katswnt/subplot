@@ -80,8 +80,8 @@ export async function setCached(key: string, value: unknown, expiresInSeconds?: 
 // v2 resolve / v3 wp: cached values are now media-typed refs, and provider keys
 // carry the media type — bumped so a pre-TV bare-id entry is never misread.
 export const CACHE_KEYS = {
-  RESOLVE_IMDB: 'subplot:resolve:v2:imdb:',
-  RESOLVE_SEARCH: 'subplot:resolve:v2:search:',
+  RESOLVE_IMDB: 'subplot:resolve:v3:imdb:', // v3: cached value now carries title/year/poster for the review step
+  RESOLVE_SEARCH: 'subplot:resolve:v3:search:',
   WATCH_PROVIDERS: 'subplot:wp:v3:', // v3: keyed by (region, mediaType, id)
 } as const;
 
