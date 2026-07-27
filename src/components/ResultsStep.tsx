@@ -236,7 +236,7 @@ export default function ResultsStep({
                 <div key={s.slug} data-testid="marginal-step">
                   <Line
                     marker={adMarker(tier?.ads)}
-                    left={<>＋ {receiptLabel(region, s.slug)}</>}
+                    left={receiptLabel(region, s.slug)}
                     title={tier?.label}
                     count={`+${s.addFilms}`}
                     price={formatMoney(s.addCost)}
@@ -263,7 +263,7 @@ export default function ResultsStep({
                 <Line
                   key={s.slug}
                   marker={adMarker(tier?.ads)}
-                  left={<>＋ {receiptLabel(region, s.slug)}</>}
+                  left={receiptLabel(region, s.slug)}
                   title={tier?.label}
                   count={`+${s.addFilms}`}
                   price={`+${formatMoney(s.addCost)}`}
