@@ -111,10 +111,31 @@ export default function WhereToWatch({ films, owned, region, providerLogos = {} 
                   {groupNote(g.owned, g.kind)} · {g.titles.length}
                 </span>
               </div>
-              <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--text-2)', lineHeight: 1.5 }}>
-                {g.titles.slice(0, 10).map((t) => t.title).join(' · ')}
-                {g.titles.length > 10 ? ` · +${g.titles.length - 10} more` : ''}
-              </p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+                {g.titles.slice(0, 12).map((t) => (
+                  <span
+                    key={t.key}
+                    style={{
+                      fontSize: 12.5,
+                      color: 'var(--text-2)',
+                      background: 'var(--raised, rgba(255,255,255,0.05))',
+                      borderRadius: 7,
+                      padding: '4px 9px',
+                      maxWidth: '100%',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {t.title}
+                  </span>
+                ))}
+                {g.titles.length > 12 ? (
+                  <span style={{ fontSize: 12.5, color: 'var(--text-dimmer)', alignSelf: 'center' }}>
+                    +{g.titles.length - 12} more
+                  </span>
+                ) : null}
+              </div>
             </div>
           ))}
         </div>

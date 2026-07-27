@@ -5,6 +5,8 @@ type Props = {
   onImported: (source: ImportSource, films: ImportedFilm[]) => void
 }
 
+type Mode = 'file' | 'paste'
+
 const monoLink: React.CSSProperties = {
   fontFamily: 'var(--font-mono)',
   fontSize: 12.5,
@@ -20,6 +22,7 @@ const monoLink: React.CSSProperties = {
 
 export default function ImportStep({ onImported }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const [mode, setMode] = useState<Mode>('paste')
   const [error, setError] = useState<string | null>(null)
   const [dragging, setDragging] = useState(false)
   const [hover, setHover] = useState(false)
@@ -60,8 +63,34 @@ export default function ImportStep({ onImported }: Props) {
 
   const pasteLineCount = pasteText.split('\n').filter((l) => l.trim().length > 0).length
 
+  const stub = (id: Mode, label: string) => {
+    const active = mode === id
+    return (
+      <button
+        type="button"
+        role="tab"
+        aria-selected={active}
+        onClick={() => setMode(id)}
+        style={{
+          flex: 1,
+          background: active ? 'rgba(198,255,61,0.06)' : 'transparent',
+          border: 'none',
+          borderBottom: `2px solid ${active ? 'var(--lime)' : 'transparent'}`,
+          cursor: 'pointer',
+          padding: '13px 8px',
+          fontFamily: 'var(--font-mono)',
+          fontSize: 12,
+          letterSpacing: '0.1em',
+          color: active ? 'var(--lime)' : 'var(--text-muted)',
+        }}
+      >
+        {label}
+      </button>
+    )
+  }
+
   return (
-    <section style={{ display: 'flex', flexDirection: 'column', gap: 22, width: '100%' }}>
+    <section style={{ display: 'flex', flexDirection: 'column', gap: 20, width: '100%' }}>
       <div>
         <h1
           style={{
@@ -76,13 +105,14 @@ export default function ImportStep({ onImported }: Props) {
           The cheapest way to watch your watchlist.
         </h1>
         <p style={{ fontSize: 15, lineHeight: 1.55, color: 'var(--text-muted)', margin: 0 }}>
-          Drop a Letterboxd/IMDb export — or just paste a list from your notes. Subplot prices every title —
-          films and TV shows — against the services you can actually subscribe to, then finds the lowest-cost
-          combination that covers the most of it.
+          Drop an export, or paste the list you already keep in Notes. Subplot prices every title — films and
+          TV — against the services you can actually subscribe to, then finds the lowest-cost combination that
+          covers the most of it.
         </p>
       </div>
 
-      {/* Ticket dropzone */}
+      {/* Split ticket: two stubs (upload | paste) on one dashed ticket. A file
+          drop works in either mode. */}
       <div
         onDragOver={(e) => {
           e.preventDefault()
@@ -98,62 +128,128 @@ export default function ImportStep({ onImported }: Props) {
         style={{
           border: `2px dashed ${dragging ? 'var(--lime)' : 'rgba(198,255,61,0.4)'}`,
           borderRadius: 18,
-          padding: '34px 22px',
-          textAlign: 'center',
-          background:
-            'repeating-linear-gradient(135deg, rgba(198,255,61,0.03) 0 10px, transparent 10px 20px)',
+          overflow: 'hidden',
+          background: 'repeating-linear-gradient(135deg, rgba(198,255,61,0.03) 0 10px, transparent 10px 20px)',
           transition: 'border-color 0.15s',
         }}
       >
-        <p
-          style={{
-            margin: '0 0 16px',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 12,
-            letterSpacing: '0.1em',
-            color: 'var(--text-muted)',
-          }}
-        >
-          DROP&nbsp;&nbsp;watchlist.csv&nbsp;&nbsp;HERE
-        </p>
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          onMouseEnter={() => setHover(true)}
-          onMouseLeave={() => setHover(false)}
-          style={{
-            background: hover ? 'var(--lime-hi)' : 'var(--lime)',
-            color: 'var(--on-lime)',
-            border: 'none',
-            borderRadius: 999,
-            padding: '12px 24px',
-            fontWeight: 700,
-            cursor: 'pointer',
-            fontSize: 14.5,
-          }}
-        >
-          Choose a file
-        </button>
-        <input
-          ref={inputRef}
-          type="file"
-          accept=".csv,.txt,text/csv,text/plain"
-          style={{ display: 'none' }}
-          onChange={(e) => {
-            const file = e.target.files?.[0]
-            if (file) void handleFile(file)
-          }}
-        />
-        <p
-          style={{
-            margin: '14px 0 0',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            color: 'var(--text-dimmer)',
-          }}
-        >
-          Letterboxd · IMDb · or a plain .txt · auto-detected
-        </p>
+        <div role="tablist" aria-label="Import method" style={{ display: 'flex', borderBottom: '1px dashed var(--perf)' }}>
+          {stub('file', 'DROP A FILE')}
+          {stub('paste', 'PASTE A LIST')}
+        </div>
+
+        <div style={{ padding: '26px 22px' }}>
+          {mode === 'file' ? (
+            <div style={{ textAlign: 'center' }}>
+              <p
+                style={{
+                  margin: '0 0 16px',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 12,
+                  letterSpacing: '0.1em',
+                  color: 'var(--text-muted)',
+                }}
+              >
+                DROP&nbsp;&nbsp;watchlist.csv&nbsp;&nbsp;HERE
+              </p>
+              <button
+                type="button"
+                onClick={() => inputRef.current?.click()}
+                onMouseEnter={() => setHover(true)}
+                onMouseLeave={() => setHover(false)}
+                style={{
+                  background: hover ? 'var(--lime-hi)' : 'var(--lime)',
+                  color: 'var(--on-lime)',
+                  border: 'none',
+                  borderRadius: 999,
+                  padding: '12px 24px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  fontSize: 14.5,
+                }}
+              >
+                Choose a file
+              </button>
+              <input
+                ref={inputRef}
+                type="file"
+                accept=".csv,.txt,text/csv,text/plain"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) void handleFile(file)
+                }}
+              />
+              <p
+                style={{
+                  margin: '14px 0 0',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 11,
+                  color: 'var(--text-dimmer)',
+                }}
+              >
+                Letterboxd · IMDb · or a plain .txt · auto-detected
+              </p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <p
+                style={{
+                  margin: 0,
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 12,
+                  letterSpacing: '0.1em',
+                  color: 'var(--text-muted)',
+                }}
+              >
+                ONE&nbsp;TITLE&nbsp;PER&nbsp;LINE&nbsp;&nbsp;—&nbsp;&nbsp;YEARS&nbsp;OPTIONAL
+              </p>
+              <textarea
+                value={pasteText}
+                onChange={(e) => setPasteText(e.target.value)}
+                placeholder={'Parasite\nThe Bear\nThe Zone of Interest (2023)\n…'}
+                rows={6}
+                spellCheck={false}
+                aria-label="Paste a watchlist, one title per line"
+                style={{
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  resize: 'vertical',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 13,
+                  lineHeight: 1.6,
+                  color: 'var(--text-1)',
+                  background: 'rgba(0,0,0,0.35)',
+                  border: '1px solid var(--perf)',
+                  borderRadius: 12,
+                  padding: '12px 14px',
+                }}
+              />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-dimmer)' }}>
+                  {pasteLineCount} {pasteLineCount === 1 ? 'line' : 'lines'}
+                </span>
+                <button
+                  type="button"
+                  disabled={pasteLineCount === 0}
+                  onClick={() => ingest(pasteText)}
+                  style={{
+                    background: pasteLineCount === 0 ? 'var(--raised, rgba(255,255,255,0.06))' : 'var(--lime)',
+                    color: pasteLineCount === 0 ? 'var(--text-dimmer)' : 'var(--on-lime)',
+                    border: 'none',
+                    borderRadius: 999,
+                    padding: '11px 22px',
+                    fontWeight: 700,
+                    fontSize: 14.5,
+                    cursor: pasteLineCount === 0 ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  Find my titles →
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {error && (
@@ -161,64 +257,6 @@ export default function ImportStep({ onImported }: Props) {
           {error}
         </p>
       )}
-
-      {/* Paste path — for lists kept in Notes, Reminders, or anywhere else */}
-      <div style={{ borderTop: '1px dashed var(--perf)', paddingTop: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <p
-          style={{
-            margin: 0,
-            fontFamily: 'var(--font-mono)',
-            fontSize: 12,
-            letterSpacing: '0.1em',
-            color: 'var(--text-muted)',
-          }}
-        >
-          OR&nbsp;&nbsp;PASTE&nbsp;A&nbsp;LIST&nbsp;&nbsp;—&nbsp;&nbsp;ONE&nbsp;TITLE&nbsp;PER&nbsp;LINE
-        </p>
-        <textarea
-          value={pasteText}
-          onChange={(e) => setPasteText(e.target.value)}
-          placeholder={'Parasite\nThe Bear\nThe Zone of Interest (2023)\n…'}
-          rows={5}
-          spellCheck={false}
-          aria-label="Paste a watchlist, one title per line"
-          style={{
-            width: '100%',
-            boxSizing: 'border-box',
-            resize: 'vertical',
-            fontFamily: 'var(--font-mono)',
-            fontSize: 13,
-            lineHeight: 1.6,
-            color: 'var(--text-1)',
-            background: 'var(--surface-card, rgba(255,255,255,0.03))',
-            border: '1px solid var(--perf)',
-            borderRadius: 12,
-            padding: '12px 14px',
-          }}
-        />
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-dimmer)' }}>
-            {pasteLineCount} {pasteLineCount === 1 ? 'line' : 'lines'}
-          </span>
-          <button
-            type="button"
-            disabled={pasteLineCount === 0}
-            onClick={() => ingest(pasteText)}
-            style={{
-              background: pasteLineCount === 0 ? 'var(--raised, rgba(255,255,255,0.06))' : 'var(--lime)',
-              color: pasteLineCount === 0 ? 'var(--text-dimmer)' : 'var(--on-lime)',
-              border: 'none',
-              borderRadius: 999,
-              padding: '10px 20px',
-              fontWeight: 700,
-              fontSize: 14,
-              cursor: pasteLineCount === 0 ? 'not-allowed' : 'pointer',
-            }}
-          >
-            Find my titles →
-          </button>
-        </div>
-      </div>
 
       <div style={{ borderTop: '1px dashed var(--perf)', paddingTop: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
         <button type="button" onClick={loadSample} disabled={loadingSample} style={monoLink}>
@@ -232,7 +270,7 @@ export default function ImportStep({ onImported }: Props) {
           <summary style={{ ...monoLink, listStyle: 'none' }}>
             <span style={{ color: 'var(--lime)' }}>?</span>
             <span style={{ textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: 3 }}>
-              How do I export my watchlist
+              How do I get my watchlist out
             </span>
           </summary>
           <div
@@ -251,8 +289,11 @@ export default function ImportStep({ onImported }: Props) {
             </p>
             <p style={{ margin: 0 }}>
               <strong style={{ color: 'var(--text-2)' }}>IMDb:</strong> open your Watchlist → the ••• menu (top
-              right) → “Export”. IMDb emails you a CSV, or downloads it directly. Upload that file — TV shows
-              come along too.
+              right) → “Export”. Upload that file — TV shows come along too.
+            </p>
+            <p style={{ margin: 0 }}>
+              <strong style={{ color: 'var(--text-2)' }}>Apple Notes / Reminders:</strong> select all your
+              titles, copy, and paste them into the box above — one per line.
             </p>
           </div>
         </details>
