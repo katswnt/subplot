@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ImportedFilm, ImportSource } from '@subplot/domain/imports'
 import { optimizeStreaming, type StreamingFilm } from '@subplot/domain/streaming'
 import ImportStep from './components/ImportStep'
@@ -10,8 +10,16 @@ import { resolveTitles, fetchAvailability, type PipelineProgress } from './lib/p
 import { buildReviewSummary, type ReviewSummary } from '@subplot/domain/review'
 import { searchTitles, type ResolveMatch, type SearchCandidate } from '@subplot/api-client'
 import type { TmdbRef } from './domain/media'
+import {
+  loadSession,
+  saveSession,
+  clearSession,
+  relativeTime,
+  ageInDays,
+  type SavedSession,
+} from './lib/session'
 
-type Phase = 'import' | 'configure' | 'working' | 'review' | 'results'
+type Phase = 'welcome' | 'import' | 'configure' | 'working' | 'review' | 'results'
 type WorkStage = 'resolving' | 'availability' | 'optimize'
 type Progress = { pct: number; label: string; stage: WorkStage }
 
@@ -43,7 +51,13 @@ const applyDisplayTitles = (
   })
 
 export default function App() {
-  const [phase, setPhase] = useState<Phase>('import')
+  // Read any device-local session synchronously so the very first render can
+  // decide between the welcome screen and a fresh import (no setState-in-effect).
+  const [restored, setRestored] = useState<SavedSession | null>(() => loadSession())
+  const [phase, setPhase] = useState<Phase>(() => (loadSession() ? 'welcome' : 'import'))
+  // One stable "now" for relative-time labels — pinned at mount, not read during
+  // each render (Date.now() in render is impure).
+  const [now] = useState(() => Date.now())
   const [films, setFilms] = useState<ImportedFilm[]>([])
   const [source, setSource] = useState<ImportSource>('unknown')
 
@@ -64,6 +78,7 @@ export default function App() {
   const [resolved, setResolved] = useState<StreamingFilm[] | null>(null)
   const [unresolved, setUnresolved] = useState(0)
   const [providerLogos, setProviderLogos] = useState<Record<number, string>>({})
+  const [resolvedAt, setResolvedAt] = useState<number | null>(null)
   const [progress, setProgress] = useState<Progress | null>(null)
   const [error, setError] = useState<string | null>(null)
   // Results view: the cheapest-combo receipt, or the where-to-watch breakdown.
@@ -133,6 +148,63 @@ export default function App() {
     },
   }
 
+  // Persist the session (list + config + last result) whenever it changes.
+  // Device-local only — never sent to a server, no cookie, nothing to track.
+  // films.length === 0 skips the initial (empty) render, so nothing overwrites
+  // a saved session until the user actually has a list.
+  useEffect(() => {
+    if (films.length === 0) return
+    saveSession({
+      savedAt: Date.now(),
+      source,
+      films,
+      config: { owned, region, adPolicy, objective, budget, includeLibraryFree, ownedTier },
+      resolved:
+        resolved && resolvedAt
+          ? { streamingFilms: resolved, unresolvedCount: unresolved, providerLogos, checkedAt: resolvedAt }
+          : undefined,
+    })
+  }, [
+    films,
+    source,
+    owned,
+    region,
+    adPolicy,
+    objective,
+    budget,
+    includeLibraryFree,
+    ownedTier,
+    resolved,
+    unresolved,
+    providerLogos,
+    resolvedAt,
+  ])
+
+  // Resume a saved session: rehydrate everything and jump to the freshest phase.
+  const resumeSaved = () => {
+    if (!restored) return
+    const { config, resolved: cached } = restored
+    setSource(restored.source)
+    setFilms(restored.films)
+    setOwned(config.owned)
+    setRegion(config.region)
+    setAdPolicy(config.adPolicy)
+    setObjective(config.objective)
+    setBudget(config.budget)
+    setIncludeLibraryFree(config.includeLibraryFree)
+    setOwnedTier(config.ownedTier)
+    if (cached) {
+      setResolved(cached.streamingFilms)
+      setUnresolved(cached.unresolvedCount)
+      setProviderLogos(cached.providerLogos)
+      setResolvedAt(cached.checkedAt)
+      setPhase('results')
+    } else {
+      setPhase('configure')
+    }
+    setRestored(null)
+  }
+
   // Stage 2 + reveal: price the confirmed films and show the receipt.
   const priceAndReveal = async (keptFilms: ImportedFilm[], keyToRef: Record<string, TmdbRef>) => {
     setError(null)
@@ -150,6 +222,7 @@ export default function App() {
     setResolved(outcome.streamingFilms)
     setUnresolved(outcome.unresolvedCount)
     setProviderLogos(outcome.providerLogos)
+    setResolvedAt(Date.now())
     await new Promise((r) => setTimeout(r, 350))
     setProgress(null)
     setPhase('results')
@@ -222,6 +295,9 @@ export default function App() {
   }
 
   const startOver = () => {
+    clearSession()
+    setRestored(null)
+    setResolvedAt(null)
     setPhase('import')
     setFilms([])
     setResolved(null)
@@ -269,6 +345,77 @@ export default function App() {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: phase === 'import' ? 22 : 16 }}>
+          {phase === 'welcome' && restored && (
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 14,
+                background: 'var(--surface-card)',
+                border: '1px solid var(--raised)',
+                borderRadius: 16,
+                padding: '22px 20px',
+              }}
+            >
+              <p style={{ margin: 0, fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--text-dimmer)' }}>
+                Welcome back
+              </p>
+              <p style={{ margin: 0, fontSize: 15.5, color: 'var(--text)' }}>
+                You have <strong>{restored.films.length}</strong>{' '}
+                {restored.films.length === 1 ? 'title' : 'titles'} saved on this device
+                {restored.resolved ? (
+                  <>
+                    {' '}— last checked{' '}
+                    <span style={{ color: 'var(--text-muted)' }}>{relativeTime(restored.resolved.checkedAt, now)}</span>.
+                  </>
+                ) : (
+                  <>
+                    {' '}from{' '}
+                    {restored.source === 'imdb' ? 'IMDb' : restored.source === 'plaintext' ? 'your list' : 'Letterboxd'}.
+                  </>
+                )}
+              </p>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={resumeSaved}
+                  style={{
+                    background: 'var(--lime)',
+                    color: 'var(--on-lime)',
+                    border: 'none',
+                    borderRadius: 999,
+                    padding: '12px 22px',
+                    fontFamily: 'var(--font-body)',
+                    fontWeight: 700,
+                    fontSize: 14.5,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {restored.resolved ? 'Show my results →' : 'Pick up where I left off →'}
+                </button>
+                <button
+                  type="button"
+                  onClick={startOver}
+                  style={{
+                    background: 'none',
+                    border: '1px solid var(--raised)',
+                    borderRadius: 999,
+                    padding: '12px 20px',
+                    color: 'var(--text-muted)',
+                    fontFamily: 'var(--font-body)',
+                    fontSize: 14.5,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Start fresh
+                </button>
+              </div>
+              <p style={{ margin: 0, fontSize: 12, color: 'var(--text-dimmer)' }}>
+                Saved only on this device — nothing is sent to a server.
+              </p>
+            </div>
+          )}
+
           {phase === 'import' && <ImportStep onImported={handleImported} />}
 
           {phase === 'configure' && (
@@ -442,6 +589,41 @@ export default function App() {
               ? 'the cheapest plans to cover your list — tap “Where to watch” for what’s streaming now ↑'
               : 'what’s on your services now — tap “Cheapest combo” for the best plans to add ↑'}
           </p>
+          {resolvedAt && (
+            <p
+              style={{
+                margin: '0 0 2px',
+                textAlign: 'center',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 10.5,
+                color: 'var(--text-dimmer)',
+              }}
+            >
+              streaming checked {relativeTime(resolvedAt, now)}
+              {ageInDays(resolvedAt, now) >= 1 && (
+                <>
+                  {' · '}
+                  <button
+                    type="button"
+                    onClick={run}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      cursor: 'pointer',
+                      color: 'var(--amber)',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 10.5,
+                      textDecoration: 'underline',
+                      textDecorationStyle: 'dotted',
+                    }}
+                  >
+                    refresh
+                  </button>
+                </>
+              )}
+            </p>
+          )}
 
           {resultsTab === 'watch' ? (
             <WhereToWatch films={resolved ?? []} owned={owned} region={region} providerLogos={providerLogos} />
