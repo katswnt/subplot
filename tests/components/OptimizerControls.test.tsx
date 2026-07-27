@@ -40,7 +40,7 @@ describe('OptimizerControls', () => {
   it('offers a 3-way ad policy segmented control', () => {
     const onAdPolicyChange = vi.fn();
     render(<OptimizerControls {...baseProps} onAdPolicyChange={onAdPolicyChange} />);
-    fireEvent.click(screen.getByRole('button', { name: /^No ads$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /No ads at all/i }));
     expect(onAdPolicyChange).toHaveBeenCalledWith('noads');
     fireEvent.click(screen.getByRole('button', { name: /^Ad-free$/i }));
     expect(onAdPolicyChange).toHaveBeenCalledWith('adfree');

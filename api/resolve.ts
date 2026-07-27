@@ -47,6 +47,28 @@ const toMatch = (mediaType: MediaType, r: TmdbResult | undefined): ResolveMatch 
   return { mediaType, id: r.id, title, year, posterPath: r.poster_path ?? null };
 };
 
+const yearOf = (r: TmdbResult): string => (r.release_date || r.first_air_date || '').slice(0, 4);
+
+/**
+ * Pick the result whose year best matches the import — exact, then ±1 (festival
+ * vs. release year), then TMDb's top-ranked hit. Beats results[0] for short /
+ * common titles ("Badlands", "Z", "Stray Dogs") where TMDb ranks a newer or
+ * more popular film first. Done client-side (not via TMDb's strict `year`
+ * param, which would drop the right film on a ±1 gap).
+ */
+const pickByYear = (candidates: TmdbResult[], yearKey: string): TmdbResult | null => {
+  if (candidates.length === 0) return null;
+  if (!yearKey) return candidates[0];
+  const y = Number(yearKey);
+  const exact = candidates.find((c) => yearOf(c) === yearKey);
+  if (exact) return exact;
+  const near = candidates.find((c) => {
+    const cy = Number(yearOf(c));
+    return Number.isFinite(cy) && Math.abs(cy - y) <= 1;
+  });
+  return near ?? candidates[0];
+};
+
 async function resolveOne(film: FilmInput, apiKey: string): Promise<ResolveMatch | null> {
   const headers: HeadersInit = { Accept: 'application/json' };
 
@@ -85,26 +107,24 @@ async function resolveOne(film: FilmInput, apiKey: string): Promise<ResolveMatch
   let match: ResolveMatch | null = null;
   const params = new URLSearchParams({ api_key: apiKey, query: film.title });
   if (mode === 'multi') {
-    // /multi carries no year query param, so keep the year signal by filtering
-    // its results: prefer the movie/TV hit whose release/first-air year matches
-    // the import (disambiguates remakes and movie-vs-series-of-same-name), and
-    // only fall back to TMDb's top-ranked hit when no year matches.
+    // No media hint → /search/multi (movies + TV), pick by closest year.
     const res = await fetch(`${TMDB}/search/multi?${params.toString()}`, { headers });
     if (!res.ok) return null;
     const data = (await res.json()) as { results?: TmdbResult[] };
     const candidates = (data.results ?? []).filter(
       (r) => (r.media_type === 'movie' || r.media_type === 'tv') && typeof r.id === 'number',
     );
-    const yearOf = (r: TmdbResult): string => (r.release_date || r.first_air_date || '').slice(0, 4);
-    const hit = (yearKey && candidates.find((r) => yearOf(r) === yearKey)) || candidates[0];
+    const hit = pickByYear(candidates, yearKey);
     if (hit) match = toMatch(hit.media_type as MediaType, hit);
   } else {
-    // TV search filters on first_air_date_year, movie search on year.
-    if (yearKey) params.set(mode === 'tv' ? 'first_air_date_year' : 'year', yearKey);
+    // Known media type (e.g. Letterboxd → movie): search that endpoint only —
+    // which already excludes the wrong-media matches — and pick by closest year.
     const res = await fetch(`${TMDB}/search/${mode}?${params.toString()}`, { headers });
     if (!res.ok) return null;
     const data = (await res.json()) as { results?: TmdbResult[] };
-    match = toMatch(mode, data.results?.[0]);
+    const candidates = (data.results ?? []).filter((r) => typeof r.id === 'number');
+    const hit = pickByYear(candidates, yearKey);
+    if (hit) match = toMatch(mode, hit);
   }
   if (match) {
     await setCached(cacheKey, match, CACHE_DURATION.RESOLVE);

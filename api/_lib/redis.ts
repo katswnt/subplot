@@ -81,7 +81,7 @@ export async function setCached(key: string, value: unknown, expiresInSeconds?: 
 // carry the media type — bumped so a pre-TV bare-id entry is never misread.
 export const CACHE_KEYS = {
   RESOLVE_IMDB: 'subplot:resolve:v3:imdb:', // v3: cached value now carries title/year/poster for the review step
-  RESOLVE_SEARCH: 'subplot:resolve:v3:search:',
+  RESOLVE_SEARCH: 'subplot:resolve:v4:search:', // v4: year-tolerant pick + movie-only for Letterboxd
   SEARCH: 'subplot:search:v1:', // free-text candidate search for the review picker
   WATCH_PROVIDERS: 'subplot:wp:v3:', // v3: keyed by (region, mediaType, id)
 } as const;

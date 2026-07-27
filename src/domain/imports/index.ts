@@ -112,8 +112,11 @@ export function parseWatchlist(csvText: string): ParseResult {
       const year = row["Year"] || "";
       const uri = row["Letterboxd URI"] || "";
       if (!title) { skipped++; continue; }
-      const key = filmKey({ uri, name: title, year });
-      imported = { title, year, letterboxdUri: uri || undefined, key };
+      // Letterboxd is a film-only platform, so resolve every row as a MOVIE
+      // (year-scoped /search/movie). Without this, short/common titles like
+      // "Badlands", "Z", "Stray Dogs" collide with popular TV shows in /multi.
+      const key = filmKey({ uri, name: title, year, mediaType: "movie" });
+      imported = { title, year, letterboxdUri: uri || undefined, mediaType: "movie", key };
     } else if (source === "imdb") {
       const title = row["Title"] || row["Original Title"] || "";
       const year = row["Year"] || "";

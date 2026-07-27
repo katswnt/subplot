@@ -22,7 +22,7 @@ describe('WhereToWatch', () => {
   it('groups titles under your owned + free services (owned + free notes)', () => {
     render(<WhereToWatch films={films} owned={['max']} region="US" />)
     // Max is owned; Tubi is free — Netflix (not owned) gets no group.
-    expect(screen.getByText(/you have it/i)).toBeInTheDocument()
+    expect(screen.getByText(/subscribed/i)).toBeInTheDocument()
     expect(screen.getByText(/free · with ads/i)).toBeInTheDocument()
   })
 

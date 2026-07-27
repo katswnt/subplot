@@ -14,7 +14,7 @@ const logoSrc = (path: string | null): string | null =>
   path ? `https://image.tmdb.org/t/p/w45${path}` : null
 
 const groupNote = (owned: boolean, kind: WatchService['kind']): string =>
-  owned ? 'you have it' : kind === 'free-library' ? 'free · library card' : 'free · with ads'
+  owned ? 'subscribed' : kind === 'free-library' ? 'free · library card' : 'free · with ads'
 
 function ServiceChip({ svc, yours }: { svc: WatchService; yours: boolean }) {
   const logo = logoSrc(svc.logoPath)

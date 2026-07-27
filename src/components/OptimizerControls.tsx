@@ -30,7 +30,7 @@ const REGIONS = Object.keys(SERVICES)
 const AD_OPTIONS: Array<{ label: string; value: AdPolicy }> = [
   { label: 'Cheapest', value: 'cheapest' },
   { label: 'Ad-free', value: 'adfree' },
-  { label: 'No ads', value: 'noads' },
+  { label: 'No ads at all', value: 'noads' },
 ]
 const OBJECTIVE_OPTIONS: Array<{ label: string; value: Objective }> = [
   { label: 'Best value', value: 'value' },
@@ -69,9 +69,9 @@ const chip = (active: boolean): React.CSSProperties => ({
 })
 
 const adPolicyHint: Record<AdPolicy, string> = {
-  cheapest: '→ Cheapest tier per service — may include ads. Free ad-supported services count.',
-  adfree: '→ Priced at each service’s ad-free tier. Free ad-supported services still count.',
-  noads: '→ Ad-free tiers, and free ad-supported services (Tubi, Pluto…) are dropped.',
+  cheapest: '→ Cheapest tier of each service — ads and all. Free ad-supported services count.',
+  adfree: '→ Your paid subscriptions on their ad-free tier. Free services like Tubi still count — you’d just see ads there.',
+  noads: '→ Zero ads anywhere: ad-free paid tiers, AND free ad-supported services (Tubi, Pluto…) are dropped.',
 }
 
 const Segmented = <T,>({

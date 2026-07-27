@@ -63,6 +63,7 @@ test("parses a Letterboxd watchlist into normalized films", () => {
   assert.equal(eeaao.year, "2022");
   assert.equal(eeaao.letterboxdUri, "https://boxd.it/oFsw");
   assert.equal(eeaao.imdbId, undefined);
+  assert.equal(eeaao.mediaType, "movie", "Letterboxd is film-only → resolve as movie");
   assert.ok(eeaao.key, "every film has a dedup key");
 });
 

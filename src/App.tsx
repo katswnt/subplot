@@ -30,6 +30,18 @@ const WORK_STEPS: Array<{ stage: WorkStage; label: string }> = [
   { stage: 'optimize', label: 'Optimize' },
 ]
 
+/** Price/display each film under its resolved title (or the correction the user
+ *  picked), not the raw text they typed — "Sing Sing", not "sing sing". */
+const applyDisplayTitles = (
+  fs: ImportedFilm[],
+  matches: Record<string, ResolveMatch>,
+  overrides: Record<string, SearchCandidate> = {},
+): ImportedFilm[] =>
+  fs.map((f) => {
+    const title = overrides[f.key]?.title ?? matches[f.key]?.title ?? f.title
+    return title === f.title ? f : { ...f, title }
+  })
+
 export default function App() {
   const [phase, setPhase] = useState<Phase>('import')
   const [films, setFilms] = useState<ImportedFilm[]>([])
@@ -176,7 +188,7 @@ export default function App() {
     )
     // Nothing uncertain → skip review entirely, price everything.
     if (summary.flagged.length === 0) {
-      await priceAndReveal(films, titles.keyToRef)
+      await priceAndReveal(applyDisplayTitles(films, titles.matches), titles.keyToRef)
       return
     }
     setReviewSummary(summary)
@@ -206,7 +218,7 @@ export default function App() {
     }
     const excluded = new Set(excludedKeys)
     const kept = films.filter((f) => !excluded.has(f.key))
-    await priceAndReveal(kept, keyToRef)
+    await priceAndReveal(applyDisplayTitles(kept, resolveData.matches, overrides), keyToRef)
   }
 
   const startOver = () => {
@@ -416,6 +428,20 @@ export default function App() {
               )
             })}
           </div>
+          <p
+            style={{
+              margin: '2px 0 2px',
+              textAlign: 'center',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 11,
+              lineHeight: 1.5,
+              color: 'var(--text-dimmer)',
+            }}
+          >
+            {resultsTab === 'combo'
+              ? 'the cheapest plans to cover your list — tap “Where to watch” for what’s streaming now ↑'
+              : 'what’s on your services now — tap “Cheapest combo” for the best plans to add ↑'}
+          </p>
 
           {resultsTab === 'watch' ? (
             <WhereToWatch films={resolved ?? []} owned={owned} region={region} providerLogos={providerLogos} />
