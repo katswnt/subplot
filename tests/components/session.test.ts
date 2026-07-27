@@ -4,9 +4,12 @@ import {
   loadSession,
   saveSession,
   clearSession,
+  loadPrefs,
+  savePrefs,
   ageInDays,
   relativeTime,
   type SavedSession,
+  type SessionConfig,
 } from '../../src/lib/session'
 
 const base: Omit<SavedSession, 'v'> = {
@@ -24,8 +27,19 @@ const base: Omit<SavedSession, 'v'> = {
   },
 }
 
+const cfg: SessionConfig = {
+  owned: ['netflix', 'max'],
+  region: 'US',
+  adPolicy: 'noads',
+  objective: 'coverage',
+  budget: 25,
+  includeLibraryFree: false,
+  ownedTier: { netflix: 'adfree' },
+}
+
 afterEach(() => {
   clearSession()
+  localStorage.removeItem('subplot:prefs')
 })
 
 describe('session persistence', () => {
@@ -77,6 +91,37 @@ describe('session persistence', () => {
     saveSession(base)
     clearSession()
     expect(loadSession()).toBeNull()
+  })
+})
+
+describe('durable preferences (survive Start fresh, independent of any list)', () => {
+  it('round-trips owned services + tiers + policy', () => {
+    savePrefs(cfg)
+    const p = loadPrefs()
+    expect(p).not.toBeNull()
+    expect(p!.owned).toEqual(['netflix', 'max'])
+    expect(p!.ownedTier).toEqual({ netflix: 'adfree' })
+    expect(p!.adPolicy).toBe('noads')
+    expect(p!.budget).toBe(25)
+  })
+
+  it('returns null when no prefs are stored', () => {
+    expect(loadPrefs()).toBeNull()
+  })
+
+  it('survives clearSession — prefs are NOT part of the session', () => {
+    savePrefs(cfg)
+    saveSession(base)
+    clearSession()
+    expect(loadSession()).toBeNull()
+    expect(loadPrefs()?.owned).toEqual(['netflix', 'max'])
+  })
+
+  it('drops malformed / wrong-version prefs without throwing', () => {
+    localStorage.setItem('subplot:prefs', '{bad')
+    expect(loadPrefs()).toBeNull()
+    localStorage.setItem('subplot:prefs', JSON.stringify({ v: 0, config: cfg }))
+    expect(loadPrefs()).toBeNull()
   })
 })
 

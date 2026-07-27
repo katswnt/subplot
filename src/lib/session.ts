@@ -10,6 +10,8 @@ import type { AdPolicy, Objective } from '../components/OptimizerControls'
  */
 const KEY = 'subplot:session'
 const V = 1
+const PREFS_KEY = 'subplot:prefs'
+const PREFS_V = 1
 
 export type SessionConfig = {
   owned: string[]
@@ -62,6 +64,32 @@ export function clearSession(): void {
     localStorage.removeItem(KEY)
   } catch {
     /* ignore */
+  }
+}
+
+/**
+ * Durable optimizer preferences — which services you own (+ tiers), ad policy,
+ * objective, budget, region. Stored SEPARATELY from the session so they stick
+ * across watchlists and survive "Start fresh": your subscriptions are a
+ * standing fact about you, not part of one list. Pre-selected on every visit.
+ */
+export function loadPrefs(): SessionConfig | null {
+  try {
+    const raw = localStorage.getItem(PREFS_KEY)
+    if (!raw) return null
+    const p = JSON.parse(raw) as { v: number; config: SessionConfig }
+    if (p.v !== PREFS_V || !p.config || !Array.isArray(p.config.owned)) return null
+    return p.config
+  } catch {
+    return null
+  }
+}
+
+export function savePrefs(config: SessionConfig): void {
+  try {
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ v: PREFS_V, config }))
+  } catch {
+    // persistence is a nicety, never block on it
   }
 }
 

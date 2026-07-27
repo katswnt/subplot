@@ -14,6 +14,8 @@ import {
   loadSession,
   saveSession,
   clearSession,
+  loadPrefs,
+  savePrefs,
   relativeTime,
   ageInDays,
   type SavedSession,
@@ -61,16 +63,21 @@ export default function App() {
   const [films, setFilms] = useState<ImportedFilm[]>([])
   const [source, setSource] = useState<ImportSource>('unknown')
 
-  // Optimizer controls (live-adjustable on the results screen).
-  const [region, setRegion] = useState('US')
-  const [owned, setOwned] = useState<string[]>([])
-  const [includeLibraryFree, setIncludeLibraryFree] = useState(true)
-  const [adPolicy, setAdPolicy] = useState<AdPolicy>('adfree')
+  // Durable preferences (services, tiers, ad policy, …) — remembered across
+  // watchlists and "Start fresh", so your subscriptions come pre-selected.
+  const [prefs] = useState(() => loadPrefs())
+
+  // Optimizer controls (live-adjustable on the results screen), seeded from any
+  // saved preferences so a returning visitor doesn't re-pick their services.
+  const [region, setRegion] = useState(prefs?.region ?? 'US')
+  const [owned, setOwned] = useState<string[]>(prefs?.owned ?? [])
+  const [includeLibraryFree, setIncludeLibraryFree] = useState(prefs?.includeLibraryFree ?? true)
+  const [adPolicy, setAdPolicy] = useState<AdPolicy>(prefs?.adPolicy ?? 'adfree')
   // What the recommendation optimizes for, + an optional hard budget cap ($).
-  const [objective, setObjective] = useState<Objective>('value')
-  const [budget, setBudget] = useState<number | null>(null)
+  const [objective, setObjective] = useState<Objective>(prefs?.objective ?? 'value')
+  const [budget, setBudget] = useState<number | null>(prefs?.budget ?? null)
   // Manual tier overrides for owned services (display-only: which tier you pay).
-  const [ownedTier, setOwnedTier] = useState<Record<string, string>>({})
+  const [ownedTier, setOwnedTier] = useState<Record<string, string>>(prefs?.ownedTier ?? {})
   const [editingTier, setEditingTier] = useState<string | null>(null)
 
   // Resolved films (the once-per-region network result). Optimization is pure,
@@ -179,6 +186,13 @@ export default function App() {
     providerLogos,
     resolvedAt,
   ])
+
+  // Persist the optimizer preferences on their own, independent of any list —
+  // so services/tiers/ad policy come pre-selected on the next visit and survive
+  // "Start fresh". Unlike the session effect, this runs even with no films.
+  useEffect(() => {
+    savePrefs({ owned, region, adPolicy, objective, budget, includeLibraryFree, ownedTier })
+  }, [owned, region, adPolicy, objective, budget, includeLibraryFree, ownedTier])
 
   // Resume a saved session: rehydrate everything and jump to the freshest phase.
   const resumeSaved = () => {
@@ -297,6 +311,8 @@ export default function App() {
   }
 
   const startOver = () => {
+    // Clears the list + result, NOT the service preferences — those are durable
+    // (savePrefs keeps them) so a new watchlist starts with your services set.
     clearSession()
     setRestored(null)
     setResolvedAt(null)
@@ -306,8 +322,6 @@ export default function App() {
     setReviewSummary(null)
     setResolveData(null)
     setError(null)
-    setOwned([])
-    setOwnedTier({})
     setEditingTier(null)
   }
 
