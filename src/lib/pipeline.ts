@@ -32,10 +32,12 @@ const apiConfig = (): ApiClientConfig => ({
 })
 
 // A real watchlist runs to thousands of films, but each request is capped
-// server-side (600). Chunk well under that and run a few chunks concurrently —
-// Redis caching on the server keeps repeat films (and repeat runs) cheap.
-const CHUNK_SIZE = 400
-const CHUNK_CONCURRENCY = 3
+// server-side (600). Smaller chunks (vs. one 400-title request) make the
+// progress bar move sooner and in finer steps — a 1,400-title list becomes
+// ~14 batches instead of ~4, so it doesn't sit at 0 then lurch. Redis caching
+// on the server keeps repeat films (and repeat runs) cheap.
+const CHUNK_SIZE = 100
+const CHUNK_CONCURRENCY = 4
 
 export function chunk<T>(items: readonly T[], size: number): T[][] {
   const out: T[][] = []

@@ -67,13 +67,23 @@ export function scoreMatch(item: ReviewInput): ReviewVerdict {
     return { key: item.key, score: 1, needsReview: false, reason: 'confident' };
   }
   const score = titleMatchScore(item.importedTitle, item.match.title);
-  const yearMismatch =
-    !!item.importedYear && !!item.match.year && item.importedYear !== item.match.year;
-  if (yearMismatch) {
-    return { key: item.key, score: Math.min(score, 0.5), needsReview: true, reason: 'year-mismatch' };
-  }
+  // Weak title overlap → flag regardless of year.
   if (score < REVIEW_THRESHOLD) {
     return { key: item.key, score, needsReview: true, reason: 'low-title-match' };
+  }
+  // Title matches well. A ±1 year gap is expected — Letterboxd/IMDb often carry
+  // a festival year and TMDb the release year — so only a ≥2-year gap signals a
+  // wrong version (a remake or same-name film).
+  const y1 = Number(item.importedYear);
+  const y2 = Number(item.match.year);
+  const yearConflict =
+    !!item.importedYear &&
+    !!item.match.year &&
+    Number.isFinite(y1) &&
+    Number.isFinite(y2) &&
+    Math.abs(y1 - y2) >= 2;
+  if (yearConflict) {
+    return { key: item.key, score: Math.min(score, 0.6), needsReview: true, reason: 'year-mismatch' };
   }
   return { key: item.key, score, needsReview: false, reason: 'confident' };
 }

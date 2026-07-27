@@ -58,10 +58,23 @@ test('scoreMatch: clean/subset/reordered titles are confident', () => {
   assert.equal(scoreMatch(item({ importedTitle: 'Losers', match: { title: 'Losers', year: '2019' } })).needsReview, false);
 });
 
-test('scoreMatch: a supplied year that disagrees with the match is flagged', () => {
+test('scoreMatch: a ≥2-year gap on a good title match flags (likely a remake)', () => {
   const v = scoreMatch(item({ importedTitle: 'Dune', importedYear: '2021', match: { title: 'Dune', year: '1984' } }));
   assert.equal(v.needsReview, true);
   assert.equal(v.reason, 'year-mismatch');
+});
+
+test('scoreMatch: a ±1-year gap on an exact title stays confident (festival vs release year)', () => {
+  // Letterboxd carries the festival year, TMDb the release year — this is the
+  // common case that was over-flagging clean exports.
+  for (const [imp, tmdb] of [
+    ['2013', '2014'], // Palo Alto
+    ['2020', '2019'], // First Cow
+    ['2021', '2020'], // Nomadland
+  ] as const) {
+    const v = scoreMatch(item({ importedTitle: 'Palo Alto', importedYear: imp, match: { title: 'Palo Alto', year: tmdb } }));
+    assert.equal(v.needsReview, false, `${imp} vs ${tmdb} should be confident`);
+  }
 });
 
 test('buildReviewSummary: partitions, sorts the queue worst-first, counts', () => {
