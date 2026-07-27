@@ -5,6 +5,7 @@ import ImportStep from './components/ImportStep'
 import OptimizerControls, { type AdPolicy, type Objective } from './components/OptimizerControls'
 import ResultsStep from './components/ResultsStep'
 import ReviewStep from './components/ReviewStep'
+import WhereToWatch from './components/WhereToWatch'
 import { resolveTitles, fetchAvailability, type PipelineProgress } from './lib/pipeline'
 import { buildReviewSummary, type ReviewSummary } from '@subplot/domain/review'
 import { searchTitles, type ResolveMatch, type SearchCandidate } from '@subplot/api-client'
@@ -52,6 +53,8 @@ export default function App() {
   const [unresolved, setUnresolved] = useState(0)
   const [progress, setProgress] = useState<Progress | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Results view: the cheapest-combo receipt, or the where-to-watch breakdown.
+  const [resultsTab, setResultsTab] = useState<'combo' | 'watch'>('combo')
 
   // Between resolve and pricing: the uncertain-match queue + the resolve output
   // we carry across the review step so we only price what the user confirms.
@@ -374,14 +377,56 @@ export default function App() {
 
       {phase === 'results' && result && (
         <>
-          <ResultsStep
-            result={result}
-            adPolicy={adPolicy}
-            region={region}
-            ownedTier={ownedTier}
-            unresolvedCount={unresolved}
-            onStartOver={startOver}
-          />
+          {/* Two lenses on the same result: what to subscribe to (receipt) vs.
+              where each title streams now. */}
+          <div
+            role="tablist"
+            aria-label="Results view"
+            style={{ display: 'flex', gap: 6, background: 'var(--raised)', padding: 4, borderRadius: 999 }}
+          >
+            {([
+              ['combo', '💸 Cheapest combo'],
+              ['watch', '📺 Where to watch'],
+            ] as const).map(([tab, label]) => {
+              const active = resultsTab === tab
+              return (
+                <button
+                  key={tab}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setResultsTab(tab)}
+                  style={{
+                    flex: 1,
+                    border: 'none',
+                    borderRadius: 999,
+                    padding: '9px 14px',
+                    cursor: 'pointer',
+                    fontFamily: 'var(--font-body)',
+                    fontSize: 13.5,
+                    fontWeight: 700,
+                    background: active ? 'var(--lime)' : 'transparent',
+                    color: active ? 'var(--on-lime)' : 'var(--text-muted)',
+                  }}
+                >
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+
+          {resultsTab === 'watch' ? (
+            <WhereToWatch films={resolved ?? []} owned={owned} region={region} />
+          ) : (
+            <ResultsStep
+              result={result}
+              adPolicy={adPolicy}
+              region={region}
+              ownedTier={ownedTier}
+              unresolvedCount={unresolved}
+              onStartOver={startOver}
+            />
+          )}
           <details open style={{ marginTop: 4 }}>
             <summary
               style={{
