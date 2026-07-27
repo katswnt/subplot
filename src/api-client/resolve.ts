@@ -33,6 +33,12 @@ export type ResolveMatch = TmdbRef & {
   year: string;
   /** TMDb poster path (e.g. "/abc.jpg"), or null. Build a URL with an image base. */
   posterPath: string | null;
+  /**
+   * Resolved from an authoritative source (an IMDb tconst or the Letterboxd
+   * film page's own TMDb id) rather than a fuzzy title search — the review step
+   * trusts these as-is instead of re-scoring title/year.
+   */
+  trusted?: boolean;
 };
 
 export type ResolveResponse = {

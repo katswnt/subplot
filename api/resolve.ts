@@ -21,7 +21,19 @@ import { mapPool } from './_lib/pool.js';
 type MediaType = 'movie' | 'tv';
 type TmdbRef = { mediaType: MediaType; id: number };
 /** A resolved title with the display fields the review step shows the user. */
-type ResolveMatch = { mediaType: MediaType; id: number; title: string; year: string; posterPath: string | null };
+type ResolveMatch = {
+  mediaType: MediaType;
+  id: number;
+  title: string;
+  year: string;
+  posterPath: string | null;
+  /**
+   * The match came from an authoritative source (an IMDb tconst or the
+   * Letterboxd film page's own TMDb id), not a fuzzy title search — so the
+   * review step trusts it as-is instead of re-scoring the title/year.
+   */
+  trusted?: boolean;
+};
 
 const TMDB = 'https://api.themoviedb.org/3';
 const MAX_FILMS = 600;
@@ -144,6 +156,7 @@ async function resolveViaLetterboxd(uri: string, apiKey: string): Promise<Resolv
   if (!detailRes.ok) return null;
   const match = toMatch(mediaType, (await detailRes.json()) as TmdbResult);
   if (!match) return null;
+  match.trusted = true; // the Letterboxd page's own TMDb id is authoritative
   await setCached(cacheKey, match, CACHE_DURATION.RESOLVE);
   return match;
 }
@@ -169,6 +182,7 @@ async function resolveOne(film: FilmInput, apiKey: string): Promise<ResolveMatch
     else if (movie) match = toMatch('movie', movie);
     else if (tv) match = toMatch('tv', tv);
     if (match) {
+      match.trusted = true; // resolved via an exact IMDb id
       await setCached(cacheKey, match, CACHE_DURATION.RESOLVE);
       return match;
     }

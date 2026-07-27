@@ -254,7 +254,9 @@ export default function App() {
           key: f.key,
           importedTitle: f.title,
           importedYear: f.year || undefined,
-          hadId: Boolean(f.imdbId),
+          // An imdb id OR an authoritative Letterboxd-page match is trusted as-is
+          // (no fuzzy re-scoring) — the resolver already used the exact TMDb id.
+          hadId: Boolean(f.imdbId) || Boolean(m?.trusted),
           match: m ? { title: m.title, year: m.year } : null,
         }
       }),

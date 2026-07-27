@@ -82,7 +82,7 @@ export async function setCached(key: string, value: unknown, expiresInSeconds?: 
 export const CACHE_KEYS = {
   RESOLVE_IMDB: 'subplot:resolve:v3:imdb:', // v3: cached value now carries title/year/poster for the review step
   RESOLVE_SEARCH: 'subplot:resolve:v4:search:', // v4: year-tolerant pick + movie-only for Letterboxd
-  RESOLVE_LB: 'subplot:resolve:v1:lb:', // authoritative TMDb ref scraped from a Letterboxd film page (keyed by URI)
+  RESOLVE_LB: 'subplot:resolve:v2:lb:', // v2: cached ref carries trusted:true so review skips it (keyed by URI)
   SEARCH: 'subplot:search:v1:', // free-text candidate search for the review picker
   WATCH_PROVIDERS: 'subplot:wp:v3:', // v3: keyed by (region, mediaType, id)
 } as const;
