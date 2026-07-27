@@ -97,6 +97,7 @@ export async function resolveTitles(
     title: f.title,
     year: f.year,
     mediaType: f.mediaType,
+    letterboxdUri: f.letterboxdUri,
   }))
 
   const keyToRef: Record<string, TmdbRef> = {}

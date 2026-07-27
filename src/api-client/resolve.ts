@@ -19,6 +19,12 @@ export type ResolveFilmInput = {
   year?: string;
   /** 'movie' | 'tv' when known; absent → resolved via /search/multi. */
   mediaType?: MediaType;
+  /**
+   * Letterboxd short URI (boxd.it/…) when the row came from a Letterboxd export.
+   * The film page carries the exact TMDb id + media type, so it's the
+   * authoritative fallback when title+year search is unconfident.
+   */
+  letterboxdUri?: string;
 };
 
 /** A resolved title with the display fields the review step shows the user. */
