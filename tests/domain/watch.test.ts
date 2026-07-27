@@ -57,3 +57,12 @@ test('buildWatchNow: your-service groups list owned first, then free, with their
   // Netflix-only titles never create a group when you don't own Netflix.
   assert.equal(buildWatchNow([film('X', [8])], ['max'], 'US').yourServiceGroups.length, 0);
 });
+
+test('buildWatchNow: attaches a provider logo when one is available', () => {
+  // Netflix folds ids 8 + 1796; the logo of whichever variant has one is used.
+  const w = buildWatchNow([film('A', [1796])], [], 'US', { 8: '/nflx.jpg' });
+  assert.equal(w.titles[0].services[0].slug, 'netflix');
+  assert.equal(w.titles[0].services[0].logoPath, '/nflx.jpg');
+  // No logo data → null, not a broken value.
+  assert.equal(buildWatchNow([film('B', [1899])], [], 'US').titles[0].services[0].logoPath, null);
+});

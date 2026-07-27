@@ -2,19 +2,31 @@ import { useMemo, useState } from 'react'
 import { buildWatchNow, type WatchService } from '@subplot/domain/watch'
 import type { StreamingFilm } from '@subplot/domain/streaming'
 
-type Props = { films: StreamingFilm[]; owned: string[]; region: string }
+type Props = {
+  films: StreamingFilm[]
+  owned: string[]
+  region: string
+  /** TMDb providerId → logo path (from watch-providers), for service logos. */
+  providerLogos?: Record<number, string>
+}
+
+const logoSrc = (path: string | null): string | null =>
+  path ? `https://image.tmdb.org/t/p/w45${path}` : null
 
 const groupNote = (owned: boolean, kind: WatchService['kind']): string =>
   owned ? 'you have it' : kind === 'free-library' ? 'free · library card' : 'free · with ads'
 
-function ServiceChip({ name, yours }: { name: string; yours: boolean }) {
+function ServiceChip({ svc, yours }: { svc: WatchService; yours: boolean }) {
+  const logo = logoSrc(svc.logoPath)
   return (
     <span
       style={{
-        display: 'inline-block',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 5,
         fontFamily: 'var(--font-mono)',
         fontSize: 11,
-        padding: '3px 8px',
+        padding: '3px 8px 3px 5px',
         borderRadius: 999,
         border: `1px solid ${yours ? 'var(--lime)' : 'var(--perf)'}`,
         background: yours ? 'rgba(198,255,61,0.12)' : 'transparent',
@@ -22,13 +34,19 @@ function ServiceChip({ name, yours }: { name: string; yours: boolean }) {
         whiteSpace: 'nowrap',
       }}
     >
-      {name}
+      {logo ? (
+        <img src={logo} alt="" width={16} height={16} loading="lazy" style={{ borderRadius: 3, display: 'block' }} />
+      ) : null}
+      {svc.name}
     </span>
   )
 }
 
-export default function WhereToWatch({ films, owned, region }: Props) {
-  const watch = useMemo(() => buildWatchNow(films, owned, region), [films, owned, region])
+export default function WhereToWatch({ films, owned, region, providerLogos = {} }: Props) {
+  const watch = useMemo(
+    () => buildWatchNow(films, owned, region, providerLogos),
+    [films, owned, region, providerLogos],
+  )
   const [onlyMine, setOnlyMine] = useState(false)
   const ownedSet = useMemo(() => new Set(owned), [owned])
   const isYours = (s: WatchService) => s.kind !== 'paid' || ownedSet.has(s.slug)
@@ -75,9 +93,21 @@ export default function WhereToWatch({ films, owned, region }: Props) {
                 border: '1px solid var(--perf)',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
-                <span style={{ fontSize: 15.5, fontWeight: 700 }}>{g.name}</span>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: g.owned ? 'var(--lime)' : 'var(--text-muted)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                  {g.logoPath ? (
+                    <img
+                      src={`https://image.tmdb.org/t/p/w45${g.logoPath}`}
+                      alt=""
+                      width={22}
+                      height={22}
+                      loading="lazy"
+                      style={{ borderRadius: 5, display: 'block', flex: '0 0 auto' }}
+                    />
+                  ) : null}
+                  <span style={{ fontSize: 15.5, fontWeight: 700 }}>{g.name}</span>
+                </span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: g.owned ? 'var(--lime)' : 'var(--text-muted)', whiteSpace: 'nowrap' }}>
                   {groupNote(g.owned, g.kind)} · {g.titles.length}
                 </span>
               </div>
@@ -140,7 +170,7 @@ export default function WhereToWatch({ films, owned, region }: Props) {
                     not streaming
                   </span>
                 ) : (
-                  t.services.map((s) => <ServiceChip key={s.slug} name={s.name} yours={isYours(s)} />)
+                  t.services.map((s) => <ServiceChip key={s.slug} svc={s} yours={isYours(s)} />)
                 )}
               </div>
             </div>

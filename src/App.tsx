@@ -51,6 +51,7 @@ export default function App() {
   // so we recompute the recommendation from these on every control change.
   const [resolved, setResolved] = useState<StreamingFilm[] | null>(null)
   const [unresolved, setUnresolved] = useState(0)
+  const [providerLogos, setProviderLogos] = useState<Record<number, string>>({})
   const [progress, setProgress] = useState<Progress | null>(null)
   const [error, setError] = useState<string | null>(null)
   // Results view: the cheapest-combo receipt, or the where-to-watch breakdown.
@@ -136,6 +137,7 @@ export default function App() {
     setProgress({ pct: 100, label: 'Finding your cheapest combo…', stage: 'optimize' })
     setResolved(outcome.streamingFilms)
     setUnresolved(outcome.unresolvedCount)
+    setProviderLogos(outcome.providerLogos)
     await new Promise((r) => setTimeout(r, 350))
     setProgress(null)
     setPhase('results')
@@ -416,7 +418,7 @@ export default function App() {
           </div>
 
           {resultsTab === 'watch' ? (
-            <WhereToWatch films={resolved ?? []} owned={owned} region={region} />
+            <WhereToWatch films={resolved ?? []} owned={owned} region={region} providerLogos={providerLogos} />
           ) : (
             <ResultsStep
               result={result}

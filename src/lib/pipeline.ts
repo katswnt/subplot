@@ -14,7 +14,13 @@ import { tmdbRefKey, type TmdbRef } from '../domain/media.js'
 // these, optimizeStreaming is pure + instant, so the results screen can re-run
 // it live on every control change with no further network calls.
 export type ResolveOutcome =
-  | { ok: true; streamingFilms: StreamingFilm[]; unresolvedCount: number }
+  | {
+      ok: true
+      streamingFilms: StreamingFilm[]
+      unresolvedCount: number
+      /** TMDb providerId → logo path, for rendering service logos. */
+      providerLogos: Record<number, string>
+    }
   | { ok: false; error: string }
 
 export type PipelineProgress = {
@@ -163,8 +169,16 @@ export async function fetchAvailability(
     return { key: f.key, title: f.title, providerIds, mediaType: ref?.mediaType ?? f.mediaType }
   })
 
+  // Capture each provider's logo (union across titles) for the where-to-watch view.
+  const providerLogos: Record<number, string> = {}
+  for (const fp of Object.values(providersByRefKey)) {
+    for (const p of [...fp.flatrate, ...fp.free, ...fp.ads]) {
+      if (p.logoPath && !(p.providerId in providerLogos)) providerLogos[p.providerId] = p.logoPath
+    }
+  }
+
   const unresolvedCount = films.filter((f) => !keyToRef[f.key]).length
-  return { ok: true, streamingFilms, unresolvedCount }
+  return { ok: true, streamingFilms, unresolvedCount, providerLogos }
 }
 
 /**

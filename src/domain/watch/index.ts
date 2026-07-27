@@ -10,7 +10,13 @@
 import type { StreamingFilm } from '../streaming/index.js';
 import { providerIdToSlug, serviceBySlug, type ServiceKind } from '../streaming/catalog.js';
 
-export type WatchService = { slug: string; name: string; kind: ServiceKind };
+export type WatchService = {
+  slug: string;
+  name: string;
+  kind: ServiceKind;
+  /** TMDb provider logo path (e.g. "/abc.jpg") when available, else null. */
+  logoPath: string | null;
+};
 
 export type WatchTitle = {
   key: string;
@@ -27,6 +33,7 @@ export type WatchServiceGroup = {
   slug: string;
   name: string;
   kind: ServiceKind;
+  logoPath: string | null;
   owned: boolean;
   titles: Array<{ key: string; title: string }>;
 };
@@ -57,11 +64,16 @@ export function buildWatchNow(
   films: StreamingFilm[],
   ownedSlugs: string[],
   region = 'US',
+  /** TMDb providerId → logo path, captured live from watch-providers. */
+  providerLogos: Record<number, string> = {},
 ): WatchNow {
   const idToSlug = providerIdToSlug[region] ?? new Map<number, string>();
   const bySlug = serviceBySlug[region] ?? {};
   const owned = new Set(ownedSlugs);
   const isYours = yoursFor(owned);
+  // A service folds many provider ids; use the logo of whichever variant has one.
+  const logoFor = (ids: number[]): string | null =>
+    ids.map((id) => providerLogos[id]).find(Boolean) ?? null;
 
   const titles: WatchTitle[] = films.map((f) => {
     const slugs = new Set<string>();
@@ -72,7 +84,7 @@ export function buildWatchNow(
     const services: WatchService[] = [...slugs]
       .map((slug) => bySlug[slug])
       .filter((s): s is NonNullable<typeof s> => Boolean(s))
-      .map((s) => ({ slug: s.slug, name: s.name, kind: s.kind }));
+      .map((s) => ({ slug: s.slug, name: s.name, kind: s.kind, logoPath: logoFor(s.providerIds) }));
     services.sort(
       (a, b) => Number(isYours(b)) - Number(isYours(a)) || a.name.localeCompare(b.name),
     );
@@ -92,7 +104,14 @@ export function buildWatchNow(
       if (!isYours(svc)) continue;
       let g = groups.get(svc.slug);
       if (!g) {
-        g = { slug: svc.slug, name: svc.name, kind: svc.kind, owned: owned.has(svc.slug), titles: [] };
+        g = {
+          slug: svc.slug,
+          name: svc.name,
+          kind: svc.kind,
+          logoPath: svc.logoPath,
+          owned: owned.has(svc.slug),
+          titles: [],
+        };
         groups.set(svc.slug, g);
       }
       g.titles.push({ key: t.key, title: t.title });
