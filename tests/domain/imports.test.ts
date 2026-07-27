@@ -215,3 +215,42 @@ test("parseImport: dispatches CSV exports to parseWatchlist, free text to parseL
   assert.equal(parseImport(IMDB_CSV).source, "imdb");
   assert.equal(parseImport("Parasite\nThe Bear").source, "plaintext");
 });
+
+test("parseList: strips a trailing streaming-service parenthetical", () => {
+  const r = parseList("Losers (Netflix)\nRun (HBO)");
+  assert.deepEqual(r.films.map((f) => f.title), ["Losers", "Run"]);
+});
+
+test("parseList: strips a trailing (season N) parenthetical", () => {
+  const r = parseList("Marvelous Mrs. Maisel (season 2)");
+  assert.equal(r.films[0].title, "Marvelous Mrs. Maisel");
+});
+
+test("parseList: strips a trailing 'season N' / 'season finale' qualifier", () => {
+  const r = parseList("Big Little Lies season 2\nFleabag season finale");
+  assert.deepEqual(r.films.map((f) => f.title), ["Big Little Lies", "Fleabag"]);
+});
+
+test("parseList: still captures a parenthesized year (loop keeps year, drops notes)", () => {
+  const r = parseList("Dune (2021)\nLosers (Netflix) (2019)");
+  assert.equal(r.films[0].title, "Dune");
+  assert.equal(r.films[0].year, "2021");
+  assert.equal(r.films[1].title, "Losers");
+  assert.equal(r.films[1].year, "2019");
+});
+
+test("parseList: skips a bare header word line but keeps a short real title", () => {
+  const r = parseList("TV\nUp\nMovies\nIt");
+  assert.deepEqual(r.films.map((f) => f.title), ["Up", "It"]);
+  assert.equal(r.skipped, 2); // "TV", "Movies"
+});
+
+test("parseList: only strips a TRAILING season word (leading 'Season' survives)", () => {
+  const r = parseList("Season of the Witch");
+  assert.equal(r.films[0].title, "Season of the Witch");
+});
+
+test("parseList: preserves a long (>20 char) parenthetical title", () => {
+  const r = parseList("Birdman or (The Unexpected Virtue of Ignorance)");
+  assert.equal(r.films[0].title, "Birdman or (The Unexpected Virtue of Ignorance)");
+});

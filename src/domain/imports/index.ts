@@ -172,11 +172,21 @@ const stripWrappingQuotes = (s: string): string => {
   return m ? m[1].trim() : s;
 };
 
+// Standalone-line words that are section headers ("TV", "Movies"), not titles.
+// Exact lower-cased match only, so real short titles like "Up" or "It" survive.
+const HEADER_WORDS = new Set([
+  "tv", "tv shows", "movies", "movie", "films", "film", "shows",
+  "watchlist", "to watch", "to-watch", "documentaries", "docs",
+]);
+
 /**
  * Parse a free-text watchlist (Notes / Reminders / pasted text) into titles —
  * one per line. Titles carry no IDs or type; both are resolved later via TMDb
- * /search/multi. Blank lines, section headers ("To watch:"), and duplicates are
- * counted in `skipped`.
+ * /search/multi. Beyond stripping list markers, it recovers titles from the
+ * messy annotations real notes carry: a trailing service/season parenthetical
+ * ("Losers (Netflix)", "Maisel (season 2)"), a trailing "season N / finale"
+ * qualifier ("Big Little Lies season 2"), and bare header lines ("TV"). Blank
+ * lines, headers, and duplicates are counted in `skipped`.
  */
 export function parseList(text: string): ParseResult {
   const seen = new Set<string>();
@@ -189,20 +199,32 @@ export function parseList(text: string): ParseResult {
       skipped++;
       continue;
     }
-    // Section header, e.g. "To watch:" or "Horror:". "2001: A Space Odyssey"
-    // is safe — it doesn't END with a colon.
-    if (line.endsWith(":")) {
+    // Section headers: a trailing colon ("To watch:") or a known header word on
+    // its own line ("TV"). "2001: A Space Odyssey" is safe — it doesn't END
+    // with a colon and isn't a header word.
+    if (line.endsWith(":") || HEADER_WORDS.has(line.toLowerCase())) {
       skipped++;
       continue;
     }
     line = stripWrappingQuotes(line).trim();
 
+    // Peel trailing parentheticals: capture a 4-digit year, drop short notes
+    // like "(Netflix)", "(HBO)", "(season 2)". The ≤20-char guard preserves a
+    // rare long parenthetical title.
     let year = "";
-    const withYear = line.match(/^(.*\S)\s*\((\d{4})\)\s*$/);
-    if (withYear) {
-      line = withYear[1].trim();
-      year = withYear[2];
+    for (;;) {
+      const paren = line.match(/^(.*\S)\s*\(([^)]{1,20})\)\s*$/);
+      if (!paren) break;
+      const inner = paren[2].trim();
+      if (/^\d{4}$/.test(inner) && !year) year = inner;
+      line = paren[1].trim();
     }
+
+    // Drop a TRAILING "season N" / "season finale" / "series finale" qualifier
+    // — a show reference, not part of the title. Trailing-only, so "Season of
+    // the Witch" keeps its leading word.
+    line = line.replace(/\s+(?:season\s+(?:\d+|finale)|series finale)\s*$/i, "").trim();
+
     if (!line) {
       skipped++;
       continue;
