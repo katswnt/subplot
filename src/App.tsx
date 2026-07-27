@@ -4,9 +4,13 @@ import { optimizeStreaming, type StreamingFilm } from '@subplot/domain/streaming
 import ImportStep from './components/ImportStep'
 import OptimizerControls, { type AdPolicy, type Objective } from './components/OptimizerControls'
 import ResultsStep from './components/ResultsStep'
-import { resolveWatchlist, type PipelineProgress } from './lib/pipeline'
+import ReviewStep from './components/ReviewStep'
+import { resolveTitles, fetchAvailability, type PipelineProgress } from './lib/pipeline'
+import { buildReviewSummary, type ReviewSummary } from '@subplot/domain/review'
+import type { ResolveMatch } from '@subplot/api-client'
+import type { TmdbRef } from './domain/media'
 
-type Phase = 'import' | 'configure' | 'working' | 'results'
+type Phase = 'import' | 'configure' | 'working' | 'review' | 'results'
 type WorkStage = 'resolving' | 'availability' | 'optimize'
 type Progress = { pct: number; label: string; stage: WorkStage }
 
@@ -48,6 +52,14 @@ export default function App() {
   const [unresolved, setUnresolved] = useState(0)
   const [progress, setProgress] = useState<Progress | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  // Between resolve and pricing: the uncertain-match queue + the resolve output
+  // we carry across the review step so we only price what the user confirms.
+  const [reviewSummary, setReviewSummary] = useState<ReviewSummary | null>(null)
+  const [resolveData, setResolveData] = useState<{
+    matches: Record<string, ResolveMatch>
+    keyToRef: Record<string, TmdbRef>
+  } | null>(null)
 
   const result = useMemo(() => {
     if (!resolved) return null
@@ -105,16 +117,12 @@ export default function App() {
     },
   }
 
-  const run = async () => {
-    // Already resolved (returning from Plans) → recompute is instant, no re-fetch.
-    if (resolved) {
-      setPhase('results')
-      return
-    }
+  // Stage 2 + reveal: price the confirmed films and show the receipt.
+  const priceAndReveal = async (keptFilms: ImportedFilm[], keyToRef: Record<string, TmdbRef>) => {
     setError(null)
-    setProgress({ pct: 0, label: 'Reading your watchlist…', stage: 'resolving' })
+    setProgress({ pct: 45, label: 'Checking where each title streams…', stage: 'availability' })
     setPhase('working')
-    const outcome = await resolveWatchlist(films, region, (p) => setProgress(progressView(p)))
+    const outcome = await fetchAvailability(keptFilms, keyToRef, region, (p) => setProgress(progressView(p)))
     if (!outcome.ok) {
       setError(outcome.error)
       setProgress(null)
@@ -130,10 +138,61 @@ export default function App() {
     setPhase('results')
   }
 
+  const run = async () => {
+    // Already resolved (returning from Plans) → recompute is instant, no re-fetch.
+    if (resolved) {
+      setPhase('results')
+      return
+    }
+    setError(null)
+    setProgress({ pct: 0, label: 'Reading your watchlist…', stage: 'resolving' })
+    setPhase('working')
+    // Stage 1 — resolve titles to TMDb refs + display info.
+    const titles = await resolveTitles(films, (p) => setProgress(progressView(p)))
+    if (!titles.ok) {
+      setError(titles.error)
+      setProgress(null)
+      setPhase('configure')
+      return
+    }
+    setResolveData({ matches: titles.matches, keyToRef: titles.keyToRef })
+    // Score every match; only the uncertain ones become a review queue.
+    const summary = buildReviewSummary(
+      films.map((f) => {
+        const m = titles.matches[f.key]
+        return {
+          key: f.key,
+          importedTitle: f.title,
+          importedYear: f.year || undefined,
+          hadId: Boolean(f.imdbId),
+          match: m ? { title: m.title, year: m.year } : null,
+        }
+      }),
+    )
+    // Nothing uncertain → skip review entirely, price everything.
+    if (summary.flagged.length === 0) {
+      await priceAndReveal(films, titles.keyToRef)
+      return
+    }
+    setReviewSummary(summary)
+    setProgress(null)
+    setPhase('review')
+  }
+
+  // From the review step: drop the skipped (+ unmatched) keys, then price the rest.
+  const confirmReview = async (excludedKeys: string[]) => {
+    if (!resolveData) return
+    const excluded = new Set(excludedKeys)
+    const kept = films.filter((f) => !excluded.has(f.key))
+    await priceAndReveal(kept, resolveData.keyToRef)
+  }
+
   const startOver = () => {
     setPhase('import')
     setFilms([])
     setResolved(null)
+    setReviewSummary(null)
+    setResolveData(null)
     setError(null)
     setOwned([])
     setOwnedTier({})
@@ -182,7 +241,7 @@ export default function App() {
             <>
           <p style={{ margin: 0, fontSize: 13.5, color: 'var(--text-muted)' }}>
             Imported <strong style={{ color: 'var(--text)' }}>{films.length}</strong> titles from{' '}
-            {source === 'imdb' ? 'IMDb' : 'Letterboxd'}.{' '}
+            {source === 'imdb' ? 'IMDb' : source === 'plaintext' ? 'your list' : 'Letterboxd'}.{' '}
             <button
               type="button"
               onClick={startOver}
@@ -224,6 +283,20 @@ export default function App() {
             </p>
           )}
         </>
+      )}
+
+      {phase === 'review' && reviewSummary && resolveData && (
+        <ReviewStep
+          flagged={reviewSummary.flagged}
+          matches={resolveData.matches}
+          importedTitleByKey={Object.fromEntries(films.map((f) => [f.key, f.title]))}
+          confidentCount={reviewSummary.confidentCount}
+          onConfirm={confirmReview}
+          onBack={() => {
+            setReviewSummary(null)
+            setPhase('configure')
+          }}
+        />
       )}
 
       {phase === 'working' && progress && (
