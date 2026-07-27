@@ -12,7 +12,7 @@
 import { filmKey } from "../film-key.js";
 import type { MediaType } from "../media.js";
 
-export type ImportSource = "letterboxd" | "imdb" | "unknown";
+export type ImportSource = "letterboxd" | "imdb" | "plaintext" | "unknown";
 
 export type ImportedFilm = {
   title: string;
@@ -134,4 +134,100 @@ export function parseWatchlist(csvText: string): ParseResult {
   }
 
   return { source, films, skipped };
+}
+
+// --- Plain-text lists (Apple Notes / Reminders / a pasted list) ---------------
+//
+// People who don't use Letterboxd/IMDb keep watchlists as free text: one title
+// per line, often with bullets, numbers, or checkboxes. We resolve titles to
+// TMDb downstream via /search/multi (no IDs here, and no type signal — so, like
+// Letterboxd rows, mediaType is left unset for TMDb to discover).
+//
+// Deliberately conservative — over-cleaning corrupts real titles:
+//   • Split on NEWLINES only. Commas are NOT delimiters ("Crouching Tiger,
+//     Hidden Dragon", "Goodbye, Dragon Inn" are single titles).
+//   • Only a PARENTHESIZED "(YYYY)" is treated as a year. A bare trailing year
+//     is frequently the title itself ("1917", "2001", "1984").
+//   • Trailing free-text notes / subtitles after a dash are LEFT IN — we can't
+//     tell "The Two Towers - ..." (subtitle) from "Parasite - loved it" (note),
+//     and fuzzy TMDb search tolerates the extra words better than mis-stripping.
+
+/** Strip stacked leading list markers: bullets, "1." / "1)" / "(1)", and
+ *  checkboxes ("[ ]", "[x]", ☐/☑/✓). Applied repeatedly so "- [ ] Title"
+ *  (a markdown task = two markers) fully unwraps. */
+const stripListMarkers = (line: string): string => {
+  const marker = /^\s*(?:[-*•·–—]+|\d+[.)]|\(\d+\)|\[[ xX✓]?\]|[☐☑✓✅])\s*/;
+  let s = line;
+  let prev: string;
+  do {
+    prev = s;
+    s = s.replace(marker, "");
+  } while (s !== prev && s.length > 0);
+  return s;
+};
+
+/** Drop a single pair of matching surrounding quotes (straight or curly). */
+const stripWrappingQuotes = (s: string): string => {
+  const m = s.match(/^["'“](.+)["'”]$/);
+  return m ? m[1].trim() : s;
+};
+
+/**
+ * Parse a free-text watchlist (Notes / Reminders / pasted text) into titles —
+ * one per line. Titles carry no IDs or type; both are resolved later via TMDb
+ * /search/multi. Blank lines, section headers ("To watch:"), and duplicates are
+ * counted in `skipped`.
+ */
+export function parseList(text: string): ParseResult {
+  const seen = new Set<string>();
+  const films: ImportedFilm[] = [];
+  let skipped = 0;
+
+  for (const rawLine of text.split(/\r?\n/)) {
+    let line = stripListMarkers(rawLine).trim();
+    if (!line) {
+      skipped++;
+      continue;
+    }
+    // Section header, e.g. "To watch:" or "Horror:". "2001: A Space Odyssey"
+    // is safe — it doesn't END with a colon.
+    if (line.endsWith(":")) {
+      skipped++;
+      continue;
+    }
+    line = stripWrappingQuotes(line).trim();
+
+    let year = "";
+    const withYear = line.match(/^(.*\S)\s*\((\d{4})\)\s*$/);
+    if (withYear) {
+      line = withYear[1].trim();
+      year = withYear[2];
+    }
+    if (!line) {
+      skipped++;
+      continue;
+    }
+
+    const key = filmKey({ name: line, year });
+    if (!key || seen.has(key)) {
+      skipped++;
+      continue;
+    }
+    seen.add(key);
+    films.push({ title: line, year, key });
+  }
+
+  return { source: "plaintext", films, skipped };
+}
+
+/**
+ * One entry point for any pasted/uploaded text: if the first line looks like a
+ * Letterboxd/IMDb CSV header, parse it as that export; otherwise treat it as a
+ * free-text list. Lets the UI accept a file drop or a paste through one call.
+ */
+export function parseImport(text: string): ParseResult {
+  const firstLine = text.replace(/^\uFEFF/, "").split(/\r?\n/, 1)[0] ?? "";
+  const headers = firstLine.split(",").map((h) => h.trim().replace(/^"|"$/g, ""));
+  if (detectSource(headers) !== "unknown") return parseWatchlist(text);
+  return parseList(text);
 }

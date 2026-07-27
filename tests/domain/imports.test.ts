@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {
   parseWatchlist,
   parseCsv,
+  parseList,
+  parseImport,
   detectSource,
   type ImportedFilm,
 } from "../../src/domain/imports/index.js";
@@ -138,4 +140,78 @@ test("deterministic: same CSV → identical films", () => {
   const a = parseWatchlist(IMDB_CSV);
   const b = parseWatchlist(IMDB_CSV);
   assert.deepEqual(a, b);
+});
+
+// --- Plain-text lists (Notes / Reminders / pasted text) ----------------------
+
+test("parseList: one title per line, source is plaintext", () => {
+  const r = parseList("Parasite\nThe Bear\nThe Zone of Interest");
+  assert.equal(r.source, "plaintext");
+  assert.deepEqual(
+    r.films.map((f) => f.title),
+    ["Parasite", "The Bear", "The Zone of Interest"],
+  );
+});
+
+test("parseList: strips bullets, numbers, and parenthesized-number markers", () => {
+  const r = parseList("- Parasite\n* Aftersun\n• Dune\n1. Heat\n2) Sicario\n(3) Arrival");
+  assert.deepEqual(
+    r.films.map((f) => f.title),
+    ["Parasite", "Aftersun", "Dune", "Heat", "Sicario", "Arrival"],
+  );
+});
+
+test("parseList: unwraps checkboxes and markdown tasks", () => {
+  const r = parseList("[ ] Parasite\n[x] Aftersun\n☐ Dune\n- [ ] Heat");
+  assert.deepEqual(
+    r.films.map((f) => f.title),
+    ["Parasite", "Aftersun", "Dune", "Heat"],
+  );
+});
+
+test("parseList: extracts a parenthesized year but leaves a bare year title intact", () => {
+  const r = parseList("Dune (2021)\n1917\n2001: A Space Odyssey");
+  assert.equal(r.films[0].title, "Dune");
+  assert.equal(r.films[0].year, "2021");
+  assert.equal(r.films[1].title, "1917");
+  assert.equal(r.films[1].year, "");
+  assert.equal(r.films[2].title, "2001: A Space Odyssey");
+});
+
+test("parseList: leaves mediaType unset (TMDb /search/multi discovers it)", () => {
+  const r = parseList("The Bear");
+  assert.equal(r.films[0].mediaType, undefined);
+});
+
+test("parseList: does NOT split on commas (comma-bearing titles stay whole)", () => {
+  const r = parseList("Crouching Tiger, Hidden Dragon\nGoodbye, Dragon Inn");
+  assert.equal(r.films.length, 2);
+  assert.equal(r.films[0].title, "Crouching Tiger, Hidden Dragon");
+});
+
+test("parseList: skips blank lines and section headers, counts them", () => {
+  const r = parseList("To watch:\n\nParasite\n  \nHorror:\nHereditary");
+  assert.deepEqual(
+    r.films.map((f) => f.title),
+    ["Parasite", "Hereditary"],
+  );
+  assert.equal(r.skipped, 4);
+});
+
+test("parseList: dedupes case/space-insensitively via filmKey", () => {
+  const r = parseList("Parasite\nparasite\n  Parasite  ");
+  assert.equal(r.films.length, 1);
+  assert.equal(r.skipped, 2);
+});
+
+test("parseList: strips wrapping quotes but keeps trailing notes", () => {
+  const r = parseList('"Parasite"\nThe Two Towers - extended');
+  assert.equal(r.films[0].title, "Parasite");
+  assert.equal(r.films[1].title, "The Two Towers - extended");
+});
+
+test("parseImport: dispatches CSV exports to parseWatchlist, free text to parseList", () => {
+  assert.equal(parseImport(LETTERBOXD_CSV).source, "letterboxd");
+  assert.equal(parseImport(IMDB_CSV).source, "imdb");
+  assert.equal(parseImport("Parasite\nThe Bear").source, "plaintext");
 });

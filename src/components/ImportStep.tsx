@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { parseWatchlist, type ImportSource, type ImportedFilm } from '@subplot/domain/imports'
+import { parseImport, type ImportSource, type ImportedFilm } from '@subplot/domain/imports'
 
 type Props = {
   onImported: (source: ImportSource, films: ImportedFilm[]) => void
@@ -24,12 +24,15 @@ export default function ImportStep({ onImported }: Props) {
   const [dragging, setDragging] = useState(false)
   const [hover, setHover] = useState(false)
   const [loadingSample, setLoadingSample] = useState(false)
+  const [pasteText, setPasteText] = useState('')
 
   const ingest = (text: string) => {
-    const { source, films } = parseWatchlist(text)
-    if (source === 'unknown' || films.length === 0) {
+    // parseImport auto-detects: a Letterboxd/IMDb CSV export vs. a free-text
+    // list (Notes, Reminders, anywhere — one title per line).
+    const { source, films } = parseImport(text)
+    if (films.length === 0) {
       setError(
-        "That doesn't look like a Letterboxd or IMDb watchlist export. Make sure you're uploading the CSV file.",
+        'Couldn’t find any titles in that. Paste one per line, or upload a Letterboxd/IMDb CSV export.',
       )
       return
     }
@@ -55,6 +58,8 @@ export default function ImportStep({ onImported }: Props) {
     }
   }
 
+  const pasteLineCount = pasteText.split('\n').filter((l) => l.trim().length > 0).length
+
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: 22, width: '100%' }}>
       <div>
@@ -71,8 +76,9 @@ export default function ImportStep({ onImported }: Props) {
           The cheapest way to watch your watchlist.
         </h1>
         <p style={{ fontSize: 15, lineHeight: 1.55, color: 'var(--text-muted)', margin: 0 }}>
-          Drop your export. Subplot prices every title — films and TV shows — against the services you can
-          actually subscribe to, then finds the lowest-cost combination that covers the most of it.
+          Drop a Letterboxd/IMDb export — or just paste a list from your notes. Subplot prices every title —
+          films and TV shows — against the services you can actually subscribe to, then finds the lowest-cost
+          combination that covers the most of it.
         </p>
       </div>
 
@@ -131,7 +137,7 @@ export default function ImportStep({ onImported }: Props) {
         <input
           ref={inputRef}
           type="file"
-          accept=".csv,text/csv"
+          accept=".csv,.txt,text/csv,text/plain"
           style={{ display: 'none' }}
           onChange={(e) => {
             const file = e.target.files?.[0]
@@ -146,7 +152,7 @@ export default function ImportStep({ onImported }: Props) {
             color: 'var(--text-dimmer)',
           }}
         >
-          Letterboxd or IMDb · auto-detected
+          Letterboxd · IMDb · or a plain .txt · auto-detected
         </p>
       </div>
 
@@ -155,6 +161,64 @@ export default function ImportStep({ onImported }: Props) {
           {error}
         </p>
       )}
+
+      {/* Paste path — for lists kept in Notes, Reminders, or anywhere else */}
+      <div style={{ borderTop: '1px dashed var(--perf)', paddingTop: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <p
+          style={{
+            margin: 0,
+            fontFamily: 'var(--font-mono)',
+            fontSize: 12,
+            letterSpacing: '0.1em',
+            color: 'var(--text-muted)',
+          }}
+        >
+          OR&nbsp;&nbsp;PASTE&nbsp;A&nbsp;LIST&nbsp;&nbsp;—&nbsp;&nbsp;ONE&nbsp;TITLE&nbsp;PER&nbsp;LINE
+        </p>
+        <textarea
+          value={pasteText}
+          onChange={(e) => setPasteText(e.target.value)}
+          placeholder={'Parasite\nThe Bear\nThe Zone of Interest (2023)\n…'}
+          rows={5}
+          spellCheck={false}
+          aria-label="Paste a watchlist, one title per line"
+          style={{
+            width: '100%',
+            boxSizing: 'border-box',
+            resize: 'vertical',
+            fontFamily: 'var(--font-mono)',
+            fontSize: 13,
+            lineHeight: 1.6,
+            color: 'var(--text-1)',
+            background: 'var(--surface-card, rgba(255,255,255,0.03))',
+            border: '1px solid var(--perf)',
+            borderRadius: 12,
+            padding: '12px 14px',
+          }}
+        />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-dimmer)' }}>
+            {pasteLineCount} {pasteLineCount === 1 ? 'line' : 'lines'}
+          </span>
+          <button
+            type="button"
+            disabled={pasteLineCount === 0}
+            onClick={() => ingest(pasteText)}
+            style={{
+              background: pasteLineCount === 0 ? 'var(--raised, rgba(255,255,255,0.06))' : 'var(--lime)',
+              color: pasteLineCount === 0 ? 'var(--text-dimmer)' : 'var(--on-lime)',
+              border: 'none',
+              borderRadius: 999,
+              padding: '10px 20px',
+              fontWeight: 700,
+              fontSize: 14,
+              cursor: pasteLineCount === 0 ? 'not-allowed' : 'pointer',
+            }}
+          >
+            Find my titles →
+          </button>
+        </div>
+      </div>
 
       <div style={{ borderTop: '1px dashed var(--perf)', paddingTop: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
         <button type="button" onClick={loadSample} disabled={loadingSample} style={monoLink}>
