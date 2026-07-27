@@ -72,7 +72,7 @@ function Line({
         style={{ flex: '1 1 12px', minWidth: 12, borderBottom: `1px dotted ${leaderColor}`, transform: 'translateY(-3px)' }}
       />
       {count && (
-        <span style={{ flex: '0 0 auto', width: 84, textAlign: 'right', color: countColor, whiteSpace: 'nowrap' }}>
+        <span style={{ flex: '0 0 auto', width: 48, textAlign: 'right', color: countColor, whiteSpace: 'nowrap' }}>
           {count}
         </span>
       )}
@@ -99,6 +99,21 @@ function MarkerLegend() {
 
 /** ● ad-free · ◐ with ads. */
 const adMarker = (ads: boolean | undefined): string => (ads ? '◐' : '●')
+
+/**
+ * A few brand names are too long for the receipt's tight single-line rows and
+ * truncate on phones ("Amazon Prime Video", "The Roku Channel"). They read fine
+ * shortened here; the full name is still used in prose (the FREE teaser) and on
+ * the "where to watch" chips.
+ */
+const RECEIPT_SHORT_NAME: Record<string, string> = {
+  'amazon-prime': 'Prime Video',
+  criterion: 'Criterion',
+  'roku-channel': 'Roku Channel',
+  freevee: 'Freevee',
+}
+const receiptLabel = (region: string, slug: string): string =>
+  RECEIPT_SHORT_NAME[slug] ?? serviceLabel(region, slug)
 
 export default function ResultsStep({
   result,
@@ -221,9 +236,9 @@ export default function ResultsStep({
                 <div key={s.slug} data-testid="marginal-step">
                   <Line
                     marker={adMarker(tier?.ads)}
-                    left={<>＋ {s.name}</>}
+                    left={<>＋ {receiptLabel(region, s.slug)}</>}
                     title={tier?.label}
-                    count={`+${s.addFilms} titles`}
+                    count={`+${s.addFilms}`}
                     price={formatMoney(s.addCost)}
                     leaderColor="var(--lime-leader)"
                     countColor="var(--lime)"
@@ -248,7 +263,7 @@ export default function ResultsStep({
                 <Line
                   key={s.slug}
                   marker={adMarker(tier?.ads)}
-                  left={<>＋ {s.name}</>}
+                  left={<>＋ {receiptLabel(region, s.slug)}</>}
                   title={tier?.label}
                   count={`+${s.addFilms}`}
                   price={`+${formatMoney(s.addCost)}`}
@@ -272,8 +287,8 @@ export default function ResultsStep({
               <Line
                 key={f.slug}
                 marker="◐"
-                left={<span data-testid="free-service">{serviceLabel(region, f.slug)}</span>}
-                count={`${f.coveredCount} titles`}
+                left={<span data-testid="free-service">{receiptLabel(region, f.slug)}</span>}
+                count={`${f.coveredCount}`}
                 price="$0.00"
                 nameColor="var(--text-2)"
               />
@@ -284,9 +299,9 @@ export default function ResultsStep({
                 <Line
                   key={o.slug}
                   marker={adMarker(tier?.ads)}
-                  left={serviceLabel(region, o.slug)}
+                  left={receiptLabel(region, o.slug)}
                   title={tier?.label}
-                  count={`${o.coveredCount} titles`}
+                  count={`${o.coveredCount}`}
                   price={formatMoney(tier?.monthly ?? 0)}
                   nameColor="var(--text-2)"
                 />
