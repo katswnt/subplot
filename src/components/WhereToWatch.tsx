@@ -42,12 +42,24 @@ function ServiceChip({ svc, yours }: { svc: WatchService; yours: boolean }) {
   )
 }
 
+// Titles shown per shelf before it clamps — roughly two tile rows at the app's
+// column width. Beyond this, a "+N more" tile expands the shelf.
+const SHELF_CAP = 12
+
 export default function WhereToWatch({ films, owned, region, providerLogos = {} }: Props) {
   const watch = useMemo(
     () => buildWatchNow(films, owned, region, providerLogos),
     [films, owned, region, providerLogos],
   )
   const [onlyMine, setOnlyMine] = useState(false)
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const toggleShelf = (slug: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(slug)) next.delete(slug)
+      else next.add(slug)
+      return next
+    })
   const ownedSet = useMemo(() => new Set(owned), [owned])
   const isYours = (s: WatchService) => s.kind !== 'paid' || ownedSet.has(s.slug)
 
@@ -111,31 +123,53 @@ export default function WhereToWatch({ films, owned, region, providerLogos = {} 
                   {groupNote(g.owned, g.kind)} · {g.titles.length}
                 </span>
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
-                {g.titles.slice(0, 12).map((t) => (
-                  <span
-                    key={t.key}
-                    style={{
-                      fontSize: 12.5,
-                      color: 'var(--text-2)',
-                      background: 'var(--raised, rgba(255,255,255,0.05))',
-                      borderRadius: 7,
-                      padding: '4px 9px',
-                      maxWidth: '100%',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {t.title}
-                  </span>
-                ))}
-                {g.titles.length > 12 ? (
-                  <span style={{ fontSize: 12.5, color: 'var(--text-dimmer)', alignSelf: 'center' }}>
-                    +{g.titles.length - 12} more
-                  </span>
-                ) : null}
-              </div>
+              {(() => {
+                const isExpanded = expanded.has(g.slug)
+                const hidden = g.titles.length - SHELF_CAP
+                const visible = isExpanded ? g.titles : g.titles.slice(0, SHELF_CAP)
+                return (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+                    {visible.map((t) => (
+                      <span
+                        key={t.key}
+                        style={{
+                          fontSize: 12.5,
+                          color: 'var(--text-2)',
+                          background: 'var(--raised, rgba(255,255,255,0.05))',
+                          borderRadius: 7,
+                          padding: '4px 9px',
+                          maxWidth: '100%',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {t.title}
+                      </span>
+                    ))}
+                    {hidden > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => toggleShelf(g.slug)}
+                        aria-expanded={isExpanded}
+                        style={{
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: 12,
+                          color: 'var(--lime)',
+                          background: 'transparent',
+                          border: '1px solid var(--lime-border)',
+                          borderRadius: 7,
+                          padding: '4px 9px',
+                          cursor: 'pointer',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {isExpanded ? 'show less' : `+${hidden} more`}
+                      </button>
+                    ) : null}
+                  </div>
+                )
+              })()}
             </div>
           ))}
         </div>

@@ -37,4 +37,24 @@ describe('WhereToWatch', () => {
     expect(screen.queryByText('On Netflix')).not.toBeInTheDocument()
     expect(screen.queryByText('not streaming')).not.toBeInTheDocument()
   })
+
+  it('clamps a long shelf and expands / collapses it on click', () => {
+    // 15 Max titles → shelf clamps at 12, hiding 3 behind a "+3 more" toggle.
+    const many: StreamingFilm[] = Array.from({ length: 15 }, (_, i) => ({
+      key: `t${i}`,
+      title: `Max Title ${i}`,
+      providerIds: [1899],
+    }))
+    render(<WhereToWatch films={many} owned={['max']} region="US" />)
+    // Every title also appears once in the "where each streams" list below, so
+    // count occurrences: clamped → 1 (list only), the shelf tile is hidden.
+    expect(screen.getAllByText('Max Title 12')).toHaveLength(1)
+    const toggle = screen.getByRole('button', { name: /\+3 more/i })
+
+    fireEvent.click(toggle)
+    // Expanded: the shelf now renders the hidden tile too → 2 occurrences.
+    expect(screen.getAllByText('Max Title 12')).toHaveLength(2)
+    fireEvent.click(screen.getByRole('button', { name: /show less/i }))
+    expect(screen.getAllByText('Max Title 12')).toHaveLength(1)
+  })
 })
