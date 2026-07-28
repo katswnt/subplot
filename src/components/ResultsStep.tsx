@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { toPng } from 'html-to-image'
-import type { StreamingResult } from '@subplot/domain/streaming'
+import { PRICES_AS_OF, type StreamingResult } from '@subplot/domain/streaming'
 import {
   marginalSteps,
   formatMoney,
@@ -390,7 +390,9 @@ export default function ResultsStep({
         </button>
       </div>
       <p style={{ fontSize: 11.5, color: 'var(--text-dimmer)', margin: 0, lineHeight: 1.5 }}>
-        Streaming availability by JustWatch, via TMDb. Prices are the standard monthly tier and may vary.
+        Streaming availability by JustWatch, via TMDb. Prices are the standard monthly tier, checked{' '}
+        {new Date(`${PRICES_AS_OF}-01T00:00:00`).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}, and
+        may vary.
       </p>
     </section>
   )

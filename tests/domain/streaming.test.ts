@@ -4,6 +4,7 @@ import {
   optimizeStreaming,
   serviceBySlug,
   serviceMonthly,
+  PRICES_AS_OF,
   type StreamingFilm,
 } from "../../src/domain/streaming/index.js";
 
@@ -275,4 +276,49 @@ test("tvCount tallies TV titles; movies and untyped titles don't count", () => {
   const r = optimizeStreaming(films, { region: "US" });
   assert.equal(r.totalFilms, 4);
   assert.equal(r.tvCount, 2);
+});
+
+test("overlapping catalog: the value pick is partial by design, the exact optimum stays on the frontier, and the recommendation is never dominated", () => {
+  const SHUDDER = 99; // $6.99 ad-free
+  const MGM = 34; // $6.99 ad-free
+  // Netflix (cheapest tier $7.99) covers f1–f6; Shudder covers f1–f3 + f7;
+  // MGM+ covers f4–f6 + f8. Every film overlaps two services — the case a naive
+  // greedy handles worst.
+  const films = [
+    film("f1", [NETFLIX, SHUDDER]), film("f2", [NETFLIX, SHUDDER]), film("f3", [NETFLIX, SHUDDER]),
+    film("f4", [NETFLIX, MGM]), film("f5", [NETFLIX, MGM]), film("f6", [NETFLIX, MGM]),
+    film("f7", [SHUDDER]), film("f8", [MGM]),
+  ];
+  const r = optimizeStreaming(films, { region: "US" }); // 'value' by default
+
+  // Value objective: Netflix alone is the best $/film (6 films for $7.99); adding a
+  // $6.99 service for its 1–2 remaining films busts the $2/film bar, so the value
+  // recommendation is deliberately PARTIAL (6/8), not full coverage.
+  assert.deepEqual(r.recommended.addedServices, ["netflix"]);
+  assert.equal(r.recommended.coveredCount, 6);
+
+  // The exact FULL-coverage optimum is still computed and available on the frontier:
+  // Shudder + MGM+ = all 8 for $13.98, beating Netflix + Shudder + MGM+ ($21.97).
+  const full = r.frontier
+    .filter((c) => c.coveredCount === r.totalFilms)
+    .sort((a, b) => a.monthlyCost - b.monthlyCost)[0];
+  assert.deepEqual(new Set(full.addedServices), new Set(["shudder", "mgm-plus"]));
+  assert.equal(full.monthlyCost, Math.round((price("shudder") + price("mgm-plus")) * 100) / 100);
+
+  // Guarantee: the recommended combo is Pareto-optimal — no frontier combo covers
+  // at least as much for strictly less. (You never overpay for the coverage shown.)
+  const dominated = r.frontier.some(
+    (c) => c.coveredCount >= r.recommended.coveredCount && c.monthlyCost < r.recommended.monthlyCost,
+  );
+  assert.equal(dominated, false);
+});
+
+test("catalog price snapshot is fresh (staleness alarm — re-verify prices and bump PRICES_AS_OF when this fails)", () => {
+  const asOf = new Date(`${PRICES_AS_OF}-01T00:00:00Z`);
+  assert.ok(!Number.isNaN(asOf.getTime()), "PRICES_AS_OF must be 'YYYY-MM'");
+  const monthsOld = (Date.now() - asOf.getTime()) / (1000 * 60 * 60 * 24 * 30.44);
+  assert.ok(
+    monthsOld <= 12,
+    `Prices last checked ${PRICES_AS_OF} (~${monthsOld.toFixed(0)} months ago) — re-verify and bump PRICES_AS_OF.`,
+  );
 });

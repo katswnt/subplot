@@ -14,6 +14,15 @@
  * the standard US monthly tiers as of 2026-07 — a maintained constant.
  */
 
+/**
+ * The month the prices below were last verified against providers' published
+ * rates. TMDb has no price data, so this is hand-maintained — the receipt
+ * surfaces it so users know how fresh the figures are, and a domain test
+ * (streaming.test.ts) fails once it goes stale enough to warrant re-checking.
+ * Format: 'YYYY-MM'.
+ */
+export const PRICES_AS_OF = '2026-07';
+
 export type Region = string; // ISO 3166-1 alpha-2
 
 export type ServiceTier = {
