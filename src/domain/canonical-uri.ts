@@ -1,24 +1,9 @@
-export function canonicalizeLetterboxdUri(
-  uri: string,
-  uriMap?: Record<string, string> | null,
-): string {
-  uri = (uri || "").trim();
+/** Normalize a Letterboxd film URL to `https://letterboxd.com/film/<slug>/`.
+ *  Short `boxd.it/…` links carry no slug, so they pass through unchanged (the
+ *  film key then falls back to title|year). */
+export function canonicalizeLetterboxdUri(uri: string): string {
+  uri = (uri || "").trim().replace(/\/+$/, "");
   if (!uri) return uri;
-
-  uri = uri.replace(/\/+$/, "");
-
-  if (/^https?:\/\/boxd\.it\//i.test(uri)) {
-    const mapped = uriMap ? uriMap[uri] : null;
-    if (typeof mapped === "string" && mapped.trim()) {
-      return mapped.trim();
-    }
-    return uri;
-  }
-
   const match = uri.match(/https?:\/\/letterboxd\.com\/(?:[^/]+\/)?film\/([^/]+)/i);
-  if (match) {
-    return `https://letterboxd.com/film/${match[1]}/`;
-  }
-
-  return uri;
+  return match ? `https://letterboxd.com/film/${match[1]}/` : uri;
 }
