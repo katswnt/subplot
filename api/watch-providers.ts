@@ -3,6 +3,7 @@ import { getCached, setCached, CACHE_KEYS, CACHE_DURATION } from './_lib/redis.j
 import { sendError, sendValidationError, setCors, parseJsonBody } from './_lib/http.js';
 import { validate, array, number, string, oneOf } from './_lib/validate.js';
 import { mapPool } from './_lib/pool.js';
+import { checkRateLimit } from './_lib/rate-limit.js';
 
 /**
  * Subplot — per-title streaming availability from TMDb watch/providers.
@@ -80,6 +81,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCors(res, 'POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return sendError(req, res, 405, 'method_not_allowed', 'Use POST.');
+
+  const rl = await checkRateLimit(req, 'watch-providers');
+  if (!rl.ok) {
+    res.setHeader('Retry-After', String(rl.retryAfter));
+    return sendError(req, res, 429, 'rate_limited', 'Too many requests — please slow down.');
+  }
 
   const body = parseJsonBody(req);
   if (!body) return sendError(req, res, 400, 'invalid_json', 'Request body must be JSON.');

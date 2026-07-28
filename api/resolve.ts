@@ -3,6 +3,7 @@ import { getCached, setCached, CACHE_KEYS, CACHE_DURATION } from './_lib/redis.j
 import { sendError, sendValidationError, setCors, parseJsonBody } from './_lib/http.js';
 import { validate, array, string, optional, oneOf } from './_lib/validate.js';
 import { mapPool } from './_lib/pool.js';
+import { checkRateLimit } from './_lib/rate-limit.js';
 
 /**
  * Subplot — resolve imported watchlist titles to TMDb refs.
@@ -123,11 +124,23 @@ const isConfident = (film: FilmInput, match: ResolveMatch): boolean => {
  * only when title+year search is unconfident, so the cost is bounded to the
  * hard cases. Cached permanently by URI (a film's TMDb id never changes).
  */
-async function resolveViaLetterboxd(uri: string, apiKey: string): Promise<ResolveMatch | null> {
+/** Per-request budget capping LIVE Letterboxd fetches (cache hits are free), so
+ *  a single 600-title request can't amplify into 600 scrapes. */
+type ScrapeBudget = { used: number; max: number };
+
+async function resolveViaLetterboxd(
+  uri: string,
+  apiKey: string,
+  budget: ScrapeBudget,
+): Promise<ResolveMatch | null> {
   if (!/^https?:\/\/(boxd\.it|letterboxd\.com)\//i.test(uri)) return null;
   const cacheKey = `${CACHE_KEYS.RESOLVE_LB}${uri}`;
   const cached = await getCached<ResolveMatch>(cacheKey);
   if (cached) return cached;
+
+  // Cache miss → a live fetch. Stop once this request's scrape budget is spent.
+  if (budget.used >= budget.max) return null;
+  budget.used++;
 
   let html: string;
   try {
@@ -161,7 +174,7 @@ async function resolveViaLetterboxd(uri: string, apiKey: string): Promise<Resolv
   return match;
 }
 
-async function resolveOne(film: FilmInput, apiKey: string): Promise<ResolveMatch | null> {
+async function resolveOne(film: FilmInput, apiKey: string, budget: ScrapeBudget): Promise<ResolveMatch | null> {
   const headers: HeadersInit = { Accept: 'application/json' };
 
   // IMDb tconst → /find, which returns both movie_results and tv_results.
@@ -192,7 +205,7 @@ async function resolveOne(film: FilmInput, apiKey: string): Promise<ResolveMatch
   // Title (+ year) → search. Endpoint follows the media hint; unknown → /multi.
   if (!film.title) {
     // No title but maybe a Letterboxd URI — still resolvable authoritatively.
-    return film.letterboxdUri ? resolveViaLetterboxd(film.letterboxdUri, apiKey) : null;
+    return film.letterboxdUri ? resolveViaLetterboxd(film.letterboxdUri, apiKey, budget) : null;
   }
   const yearKey = film.year || '';
   const mode: MediaType | 'multi' = film.mediaType ?? 'multi';
@@ -226,7 +239,7 @@ async function resolveOne(film: FilmInput, apiKey: string): Promise<ResolveMatch
     return match;
   }
   if (film.letterboxdUri) {
-    const authoritative = await resolveViaLetterboxd(film.letterboxdUri, apiKey);
+    const authoritative = await resolveViaLetterboxd(film.letterboxdUri, apiKey, budget);
     if (authoritative) return authoritative;
   }
   // No URI (or its lookup failed): keep the unconfident search hit so the review
@@ -242,6 +255,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCors(res, 'POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return sendError(req, res, 405, 'method_not_allowed', 'Use POST.');
+
+  const rl = await checkRateLimit(req, 'resolve');
+  if (!rl.ok) {
+    res.setHeader('Retry-After', String(rl.retryAfter));
+    return sendError(req, res, 429, 'rate_limited', 'Too many requests — please slow down.');
+  }
 
   const body = parseJsonBody(req);
   if (!body) return sendError(req, res, 400, 'invalid_json', 'Request body must be JSON.');
@@ -264,8 +283,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const apiKey = process.env.TMDB_API_KEY;
   if (!apiKey) return sendError(req, res, 400, 'tmdb_api_key_required', 'TMDb API key required.');
 
+  // Cap live Letterboxd scrapes per request so one big batch can't amplify into
+  // hundreds of fetches; cache hits don't count against it.
+  const scrapeBudget = { used: 0, max: 120 };
+
   try {
-    const found = await mapPool(result.value.films, 8, (f) => resolveOne(f, apiKey));
+    const found = await mapPool(result.value.films, 8, (f) => resolveOne(f, apiKey, scrapeBudget));
     const matches: Record<string, ResolveMatch> = {};
     const resolved: Record<string, TmdbRef> = {};
     const unresolved: string[] = [];

@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getCached, setCached, CACHE_KEYS, CACHE_DURATION } from './_lib/redis.js';
 import { sendError, sendValidationError, setCors, parseJsonBody } from './_lib/http.js';
 import { validate, string } from './_lib/validate.js';
+import { checkRateLimit } from './_lib/rate-limit.js';
 
 /**
  * Subplot — free-text TMDb search for the review step's "find the right one"
@@ -39,6 +40,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCors(res, 'POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return sendError(req, res, 405, 'method_not_allowed', 'Use POST.');
+
+  const rl = await checkRateLimit(req, 'search', 60);
+  if (!rl.ok) {
+    res.setHeader('Retry-After', String(rl.retryAfter));
+    return sendError(req, res, 429, 'rate_limited', 'Too many requests — please slow down.');
+  }
 
   const body = parseJsonBody(req);
   if (!body) return sendError(req, res, 400, 'invalid_json', 'Request body must be JSON.');
