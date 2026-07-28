@@ -17,6 +17,9 @@ type Props = {
   ownedTier: Record<string, string>
   unresolvedCount?: number
   onStartOver: () => void
+  /** Desktop rail: Save becomes a full-width button inside the receipt; "Start
+   *  over" lives in the top bar, so it's omitted from the actions row here. */
+  wide?: boolean
 }
 
 const mono: React.CSSProperties = { fontFamily: 'var(--font-mono)' }
@@ -122,6 +125,7 @@ export default function ResultsStep({
   ownedTier,
   unresolvedCount = 0,
   onStartOver,
+  wide = false,
 }: Props) {
   const rec = result.recommended
   const owns = result.owned.length > 0
@@ -362,33 +366,56 @@ export default function ResultsStep({
         </div>
       </div>
 
-      {/* Actions */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+      {/* Actions. On desktop the rail IS the receipt's container: Save is a
+          full-width button below it (kept out of receiptRef so it never appears
+          in the exported PNG), and "Start over" lives in the top bar. */}
+      {wide ? (
         <button
           type="button"
           onClick={saveReceipt}
           disabled={saving}
           style={{
+            width: '100%',
             background: 'transparent',
             border: '1px solid rgba(255,179,0,0.4)',
             borderRadius: 999,
-            padding: '8px 16px',
+            padding: '11px 16px',
             cursor: saving ? 'wait' : 'pointer',
             color: 'var(--amber)',
-            fontSize: 13,
+            fontSize: 13.5,
             fontWeight: 600,
           }}
         >
           {saving ? 'Saving…' : '⤓ Save receipt'}
         </button>
-        <button
-          type="button"
-          onClick={onStartOver}
-          style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--text-dim)', fontSize: 13.5 }}
-        >
-          ← Start over
-        </button>
-      </div>
+      ) : (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <button
+            type="button"
+            onClick={saveReceipt}
+            disabled={saving}
+            style={{
+              background: 'transparent',
+              border: '1px solid rgba(255,179,0,0.4)',
+              borderRadius: 999,
+              padding: '8px 16px',
+              cursor: saving ? 'wait' : 'pointer',
+              color: 'var(--amber)',
+              fontSize: 13,
+              fontWeight: 600,
+            }}
+          >
+            {saving ? 'Saving…' : '⤓ Save receipt'}
+          </button>
+          <button
+            type="button"
+            onClick={onStartOver}
+            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--text-dim)', fontSize: 13.5 }}
+          >
+            ← Start over
+          </button>
+        </div>
+      )}
       <p style={{ fontSize: 11.5, color: 'var(--text-dimmer)', margin: 0, lineHeight: 1.5 }}>
         Streaming availability by JustWatch, via TMDb. Prices are the standard monthly tier, checked{' '}
         {new Date(`${PRICES_AS_OF}-01T00:00:00`).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}, and

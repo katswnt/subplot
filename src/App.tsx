@@ -20,6 +20,7 @@ import {
   ageInDays,
   type SavedSession,
 } from './lib/session'
+import { useViewport } from './lib/useViewport'
 
 type Phase = 'welcome' | 'import' | 'configure' | 'working' | 'review' | 'results'
 type WorkStage = 'resolving' | 'availability' | 'optimize'
@@ -90,6 +91,10 @@ export default function App() {
   const [error, setError] = useState<string | null>(null)
   // Results view: the cheapest-combo receipt, or the where-to-watch breakdown.
   const [resultsTab, setResultsTab] = useState<'combo' | 'watch'>('combo')
+  // Desktop layout: on wide screens the results view drops the tab and shows both
+  // lenses side-by-side; `adjustOpen` toggles the controls drawer from the top bar.
+  const viewport = useViewport()
+  const [adjustOpen, setAdjustOpen] = useState(false)
 
   // Between resolve and pricing: the uncertain-match queue + the resolve output
   // we carry across the review step so we only price what the user confirms.
@@ -325,16 +330,50 @@ export default function App() {
     setEditingTier(null)
   }
 
+  // Results layout: `wide` (≥1100) → two columns, no tab; `wideish` (≥700) → a
+  // roomier single column with 2-up shelves; else the 472px mobile column.
+  const wideResults = phase === 'results' && !!result && viewport.wide
+  const wideishResults = phase === 'results' && !!result && viewport.wideish
+  const columnMax = wideResults ? 1280 : wideishResults ? 720 : 472
+  const brandPeriod = new Date(now).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }).toUpperCase()
+
+  // The live-adjust controls, shared by the mobile <details> and the desktop
+  // top-bar drawer.
+  const adjustPanel = (
+    <>
+      <OptimizerControls {...controlProps} compact />
+      <button
+        type="button"
+        onClick={() => setPhase('configure')}
+        style={{
+          marginTop: 14,
+          background: 'transparent',
+          border: '1px solid rgba(255,179,0,0.4)',
+          borderRadius: 999,
+          padding: '9px 16px',
+          cursor: 'pointer',
+          color: 'var(--amber)',
+          fontSize: 13,
+          fontWeight: 600,
+        }}
+      >
+        Plans → edit owned services &amp; tiers
+      </button>
+    </>
+  )
+
   return (
     <div
       style={{
         minHeight: '100dvh',
         display: 'flex',
         justifyContent: 'center',
-        background: 'radial-gradient(900px 520px at 50% -8%, #1a1810 0%, #0c0b08 62%)',
+        background: wideResults
+          ? 'radial-gradient(1200px 560px at 30% -10%, #1a1810 0%, #0c0b08 62%)'
+          : 'radial-gradient(900px 520px at 50% -8%, #1a1810 0%, #0c0b08 62%)',
       }}
     >
-      <div style={{ width: '100%', maxWidth: 472, padding: '40px 22px 90px' }}>
+      <div style={{ width: '100%', maxWidth: columnMax, padding: wideResults ? '20px 30px 70px' : '40px 22px 90px' }}>
         {/* Persistent brand bar */}
         <div
           style={{
@@ -358,6 +397,29 @@ export default function App() {
             <img src="/favicon.svg" alt="" width={19} height={19} />
             SUBPLOT
           </span>
+          {/* Desktop: the chrome the mobile view hides behind "ADJUST" lives here. */}
+          {wideResults && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 18, fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.1em' }}>
+              <span style={{ color: 'var(--text-dimmer)' }}>
+                {films.length} {films.length === 1 ? 'TITLE' : 'TITLES'} · {brandPeriod} · {region}
+              </span>
+              <button
+                type="button"
+                onClick={() => setAdjustOpen((o) => !o)}
+                aria-expanded={adjustOpen}
+                style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--amber)', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.1em' }}
+              >
+                {adjustOpen ? 'close ✕' : 'adjust services & budget'}
+              </button>
+              <button
+                type="button"
+                onClick={startOver}
+                style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.1em' }}
+              >
+                ← start over
+              </button>
+            </span>
+          )}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: phase === 'import' ? 22 : 16 }}>
@@ -552,7 +614,41 @@ export default function App() {
         </div>
       )}
 
-      {phase === 'results' && result && (
+      {/* Desktop: both lenses side-by-side, no tab. The receipt is a sticky rail
+          (its total never scrolls away); where-to-watch fills the rest. */}
+      {phase === 'results' && result && wideResults && (
+        <>
+          {adjustOpen && (
+            <div
+              style={{
+                background: 'var(--surface-card)',
+                border: '1px solid var(--raised)',
+                borderRadius: 14,
+                padding: '16px 18px',
+                marginBottom: 18,
+              }}
+            >
+              {adjustPanel}
+            </div>
+          )}
+          <div style={{ display: 'grid', gridTemplateColumns: '392px 1fr', gap: 34, alignItems: 'start' }}>
+            <div style={{ position: 'sticky', top: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <ResultsStep
+                result={result}
+                adPolicy={adPolicy}
+                region={region}
+                ownedTier={ownedTier}
+                unresolvedCount={unresolved}
+                onStartOver={startOver}
+                wide
+              />
+            </div>
+            <WhereToWatch films={resolved ?? []} owned={owned} region={region} providerLogos={providerLogos} wide />
+          </div>
+        </>
+      )}
+
+      {phase === 'results' && result && !wideResults && (
         <>
           {/* Two lenses on the same result: what to subscribe to (receipt) vs.
               where each title streams now. */}
@@ -642,7 +738,7 @@ export default function App() {
           )}
 
           {resultsTab === 'watch' ? (
-            <WhereToWatch films={resolved ?? []} owned={owned} region={region} providerLogos={providerLogos} />
+            <WhereToWatch films={resolved ?? []} owned={owned} region={region} providerLogos={providerLogos} wide={wideishResults} />
           ) : (
             <ResultsStep
               result={result}
@@ -666,26 +762,7 @@ export default function App() {
             >
               ADJUST · UPDATES LIVE
             </summary>
-            <div style={{ marginTop: 16 }}>
-              <OptimizerControls {...controlProps} compact />
-              <button
-                type="button"
-                onClick={() => setPhase('configure')}
-                style={{
-                  marginTop: 14,
-                  background: 'transparent',
-                  border: '1px solid rgba(255,179,0,0.4)',
-                  borderRadius: 999,
-                  padding: '9px 16px',
-                  cursor: 'pointer',
-                  color: 'var(--amber)',
-                  fontSize: 13,
-                  fontWeight: 600,
-                }}
-              >
-                Plans → edit owned services &amp; tiers
-              </button>
-            </div>
+            <div style={{ marginTop: 16 }}>{adjustPanel}</div>
           </details>
         </>
       )}

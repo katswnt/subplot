@@ -8,6 +8,9 @@ type Props = {
   region: string
   /** TMDb providerId → logo path (from watch-providers), for service logos. */
   providerLogos?: Record<number, string>
+  /** Desktop: shelves 2-up, bigger headline, and a fixed title column with
+   *  left-aligned chips so 40 rows read straight down instead of zig-zagging. */
+  wide?: boolean
 }
 
 const logoSrc = (path: string | null): string | null =>
@@ -46,7 +49,7 @@ function ServiceChip({ svc, yours }: { svc: WatchService; yours: boolean }) {
 // column width. Beyond this, a "+N more" tile expands the shelf.
 const SHELF_CAP = 12
 
-export default function WhereToWatch({ films, owned, region, providerLogos = {} }: Props) {
+export default function WhereToWatch({ films, owned, region, providerLogos = {}, wide = false }: Props) {
   const watch = useMemo(
     () => buildWatchNow(films, owned, region, providerLogos),
     [films, owned, region, providerLogos],
@@ -81,7 +84,17 @@ export default function WhereToWatch({ films, owned, region, providerLogos = {} 
         >
           WATCH&nbsp;NOW
         </p>
-        <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 26, margin: 0, lineHeight: 1.1 }}>
+        <h2
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontWeight: 600,
+            fontSize: wide ? 38 : 26,
+            margin: 0,
+            lineHeight: wide ? 1.06 : 1.1,
+            letterSpacing: wide ? '-0.025em' : undefined,
+            maxWidth: wide ? 620 : undefined,
+          }}
+        >
           <span style={{ color: 'var(--lime)' }}>{watch.onYourServicesCount}</span> of {total}{' '}
           {total === 1 ? 'title is' : 'titles are'} watchable right now
         </h2>
@@ -94,7 +107,15 @@ export default function WhereToWatch({ films, owned, region, providerLogos = {} 
 
       {/* Display 1 — grouped by your services */}
       {watch.yourServiceGroups.length > 0 ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div
+          style={
+            wide
+              ? // 2-up; align-items:start so a short shelf doesn't stretch to a tall
+                // one and float its edge-rail over dead space.
+                { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, alignItems: 'start' }
+              : { display: 'flex', flexDirection: 'column', gap: 10 }
+          }
+        >
           {watch.yourServiceGroups.map((g) => (
             <div
               key={g.slug}
@@ -216,10 +237,30 @@ export default function WhereToWatch({ films, owned, region, providerLogos = {} 
                 borderTop: i === 0 ? 'none' : '1px solid var(--perf)',
               }}
             >
-              <span style={{ flex: 1, minWidth: 0, fontSize: 14, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <span
+                style={{
+                  flex: wide ? '0 0 300px' : 1,
+                  minWidth: 0,
+                  fontSize: wide ? 14.5 : 14,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
                 {t.title}
               </span>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end', maxWidth: '62%' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: 6,
+                  flexWrap: 'wrap',
+                  // Desktop: chips share one left edge (read straight down the
+                  // service column); mobile: hug the right in a 62% gutter.
+                  justifyContent: wide ? 'flex-start' : 'flex-end',
+                  flex: wide ? 1 : undefined,
+                  maxWidth: wide ? undefined : '62%',
+                }}
+              >
                 {t.services.length === 0 ? (
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-dimmer)' }}>
                     not streaming
