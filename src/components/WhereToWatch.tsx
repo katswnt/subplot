@@ -69,6 +69,100 @@ export default function WhereToWatch({ films, owned, region, providerLogos = {},
   const total = watch.titles.length
   const shown = onlyMine ? watch.titles.filter((t) => t.onYourServices) : watch.titles
 
+  // One shelf card (used by both the mobile single column and the desktop
+  // two-column masonry).
+  const renderShelf = (g: (typeof watch.yourServiceGroups)[number]) => {
+    const isExpanded = expanded.has(g.slug)
+    const hidden = g.titles.length - SHELF_CAP
+    const visible = isExpanded ? g.titles : g.titles.slice(0, SHELF_CAP)
+    return (
+      <div
+        key={g.slug}
+        style={{
+          padding: 12,
+          borderRadius: 12,
+          background: 'var(--surface-card, rgba(255,255,255,0.05))',
+          border: '1px solid var(--perf)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+            {g.logoPath ? (
+              <img
+                src={`https://image.tmdb.org/t/p/w45${g.logoPath}`}
+                alt=""
+                width={22}
+                height={22}
+                loading="lazy"
+                style={{ borderRadius: 5, display: 'block', flex: '0 0 auto' }}
+              />
+            ) : null}
+            <span style={{ fontSize: 15.5, fontWeight: 700 }}>{g.name}</span>
+          </span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: g.owned ? 'var(--lime)' : 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+            {groupNote(g.owned, g.kind)} · {g.titles.length}
+          </span>
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
+          {visible.map((t) => (
+            <span
+              key={t.key}
+              style={{
+                fontSize: 12.5,
+                color: 'var(--text-2)',
+                background: 'var(--raised, rgba(255,255,255,0.05))',
+                borderRadius: 7,
+                padding: '4px 9px',
+                // Cap tile width on desktop so a long title doesn't blow out to a
+                // full row and break the shelf rhythm.
+                maxWidth: wide ? 190 : '100%',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {t.title}
+            </span>
+          ))}
+          {hidden > 0 ? (
+            <button
+              type="button"
+              onClick={() => toggleShelf(g.slug)}
+              aria-expanded={isExpanded}
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 12,
+                color: 'var(--lime)',
+                background: 'transparent',
+                border: '1px solid var(--lime-border)',
+                borderRadius: 7,
+                padding: '4px 9px',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {isExpanded ? 'show less' : `+${hidden} more`}
+            </button>
+          ) : null}
+        </div>
+      </div>
+    )
+  }
+
+  // Desktop masonry, done in JS (CSS multicol offsets the top of the 2nd column
+  // with break-inside:avoid cards). Greedily drop each shelf into the currently
+  // shorter column, estimating height by visible tile count.
+  const shelfColumns = () => {
+    const cols: (typeof watch.yourServiceGroups)[] = [[], []]
+    const heights = [0, 0]
+    for (const g of watch.yourServiceGroups) {
+      const c = heights[0] <= heights[1] ? 0 : 1
+      cols[c].push(g)
+      heights[c] += Math.min(g.titles.length, SHELF_CAP) + 3 // +header
+    }
+    return cols
+  }
+
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: 20, width: '100%' }}>
       {/* Headline */}
@@ -105,101 +199,22 @@ export default function WhereToWatch({ films, owned, region, providerLogos = {},
         </p>
       </div>
 
-      {/* Display 1 — grouped by your services */}
+      {/* Display 1 — grouped by your services. Desktop: two balanced, top-aligned
+          columns (JS masonry); mobile: a single stacked column. */}
       {watch.yourServiceGroups.length > 0 ? (
-        <div
-          style={
-            wide
-              ? // Masonry: shelves have very uneven heights (a 159-title service vs a
-                // 4-title one), so a 2-up grid forces every row to the taller card and
-                // leaves dead gaps. CSS columns pack them by height instead.
-                { columns: 2, columnGap: 14 }
-              : { display: 'flex', flexDirection: 'column', gap: 10 }
-          }
-        >
-          {watch.yourServiceGroups.map((g) => (
-            <div
-              key={g.slug}
-              style={{
-                padding: 12,
-                borderRadius: 12,
-                background: 'var(--surface-card, rgba(255,255,255,0.03))',
-                border: '1px solid var(--perf)',
-                // Masonry: keep a card whole within a column, space vertically with
-                // margin (columns ignore flex/grid gap).
-                ...(wide ? { breakInside: 'avoid' as const, marginBottom: 14 } : null),
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-                  {g.logoPath ? (
-                    <img
-                      src={`https://image.tmdb.org/t/p/w45${g.logoPath}`}
-                      alt=""
-                      width={22}
-                      height={22}
-                      loading="lazy"
-                      style={{ borderRadius: 5, display: 'block', flex: '0 0 auto' }}
-                    />
-                  ) : null}
-                  <span style={{ fontSize: 15.5, fontWeight: 700 }}>{g.name}</span>
-                </span>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: g.owned ? 'var(--lime)' : 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-                  {groupNote(g.owned, g.kind)} · {g.titles.length}
-                </span>
+        wide ? (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, alignItems: 'start' }}>
+            {shelfColumns().map((col, i) => (
+              <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {col.map(renderShelf)}
               </div>
-              {(() => {
-                const isExpanded = expanded.has(g.slug)
-                const hidden = g.titles.length - SHELF_CAP
-                const visible = isExpanded ? g.titles : g.titles.slice(0, SHELF_CAP)
-                return (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 10 }}>
-                    {visible.map((t) => (
-                      <span
-                        key={t.key}
-                        style={{
-                          fontSize: 12.5,
-                          color: 'var(--text-2)',
-                          background: 'var(--raised, rgba(255,255,255,0.05))',
-                          borderRadius: 7,
-                          padding: '4px 9px',
-                          // Cap tile width on desktop so a long title doesn't blow out
-                          // to a full row and break the shelf rhythm.
-                          maxWidth: wide ? 190 : '100%',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {t.title}
-                      </span>
-                    ))}
-                    {hidden > 0 ? (
-                      <button
-                        type="button"
-                        onClick={() => toggleShelf(g.slug)}
-                        aria-expanded={isExpanded}
-                        style={{
-                          fontFamily: 'var(--font-mono)',
-                          fontSize: 12,
-                          color: 'var(--lime)',
-                          background: 'transparent',
-                          border: '1px solid var(--lime-border)',
-                          borderRadius: 7,
-                          padding: '4px 9px',
-                          cursor: 'pointer',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {isExpanded ? 'show less' : `+${hidden} more`}
-                      </button>
-                    ) : null}
-                  </div>
-                )
-              })()}
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {watch.yourServiceGroups.map(renderShelf)}
+          </div>
+        )
       ) : (
         <p style={{ margin: 0, fontSize: 13.5, color: 'var(--text-muted)' }}>
           None of your titles are on services you have yet — see where each one streams below, or the “cheapest
