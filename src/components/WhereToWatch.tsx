@@ -110,9 +110,10 @@ export default function WhereToWatch({ films, owned, region, providerLogos = {},
         <div
           style={
             wide
-              ? // 2-up; align-items:start so a short shelf doesn't stretch to a tall
-                // one and float its edge-rail over dead space.
-                { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, alignItems: 'start' }
+              ? // Masonry: shelves have very uneven heights (a 159-title service vs a
+                // 4-title one), so a 2-up grid forces every row to the taller card and
+                // leaves dead gaps. CSS columns pack them by height instead.
+                { columns: 2, columnGap: 14 }
               : { display: 'flex', flexDirection: 'column', gap: 10 }
           }
         >
@@ -124,6 +125,9 @@ export default function WhereToWatch({ films, owned, region, providerLogos = {},
                 borderRadius: 12,
                 background: 'var(--surface-card, rgba(255,255,255,0.03))',
                 border: '1px solid var(--perf)',
+                // Masonry: keep a card whole within a column, space vertically with
+                // margin (columns ignore flex/grid gap).
+                ...(wide ? { breakInside: 'avoid' as const, marginBottom: 14 } : null),
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
@@ -159,7 +163,9 @@ export default function WhereToWatch({ films, owned, region, providerLogos = {},
                           background: 'var(--raised, rgba(255,255,255,0.05))',
                           borderRadius: 7,
                           padding: '4px 9px',
-                          maxWidth: '100%',
+                          // Cap tile width on desktop so a long title doesn't blow out
+                          // to a full row and break the shelf rhythm.
+                          maxWidth: wide ? 190 : '100%',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap',
