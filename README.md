@@ -218,10 +218,13 @@ functions before Vite bundles the app.
 
 ## Success metrics
 
-Subplot's privacy stance — no accounts, no analytics SDK, nothing about a user
-sent anywhere — rules out client-side product analytics, so success is defined in
-terms the app can measure server-side **in aggregate**, without user identity or
-watchlist contents.
+Subplot's privacy stance — no accounts, no client-side analytics SDK, and only
+aggregate server-side telemetry (counts and ratios, never a watchlist or an
+identifier) — rules out client-side product analytics. (Film titles and IDs are
+necessarily sent to the resolution function and on to TMDb to look up
+availability, as the privacy notes above describe; that is the lookup, not
+telemetry.) So success is defined in terms the app can measure server-side **in
+aggregate**, without user identity or watchlist contents.
 
 - **Activation:** a session reaches a priced receipt. The funnel to watch is
   import → resolve → review → receipt, and the drop-off between stages.

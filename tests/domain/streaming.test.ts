@@ -313,6 +313,56 @@ test("overlapping catalog: the value pick is partial by design, the exact optimu
   assert.equal(dominated, false);
 });
 
+test("property: across random instances + objectives the recommendation is a non-dominated frontier point, and the receipt reconciles", () => {
+  // Seeded LCG so any failure reproduces exactly (no Math.random in the suite).
+  let seed = 987654321;
+  const rand = () => {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    return seed / 0x7fffffff;
+  };
+  const SHUDDER = 99, MGM = 34, STARZ = 43, AMC = 526;
+  const POOL = [NETFLIX, MAX, AMAZON, CRITERION, MUBI, SHUDDER, MGM, PARAMOUNT_PREMIUM, STARZ, AMC];
+  const OBJECTIVES: Array<'value' | 'coverage' | 'fewest'> = ['value', 'coverage', 'fewest'];
+
+  for (let trial = 0; trial < 400; trial++) {
+    const n = 3 + Math.floor(rand() * 12);
+    const films = Array.from({ length: n }, (_, i) => {
+      const ids = POOL.filter(() => rand() < 0.3);
+      if (ids.length === 0) ids.push(POOL[Math.floor(rand() * POOL.length)]);
+      return film(`f${i}`, ids);
+    });
+    const objective = OBJECTIVES[Math.floor(rand() * OBJECTIVES.length)];
+    const r = optimizeStreaming(films, { region: 'US', objective });
+    const where = `trial ${trial}, objective ${objective}`;
+
+    // (1) S-01: the recommendation is never Pareto-dominated by a frontier point.
+    const dominated = r.frontier.some(
+      (c) =>
+        (c.coveredCount > r.recommended.coveredCount && c.monthlyCost <= r.recommended.monthlyCost) ||
+        (c.coveredCount >= r.recommended.coveredCount && c.monthlyCost < r.recommended.monthlyCost),
+    );
+    assert.equal(dominated, false, `dominated recommendation — ${where}`);
+
+    // (2) It is a member of the exact frontier (same coverage + cost as some point).
+    const onFrontier = r.frontier.some(
+      (c) => c.coveredCount === r.recommended.coveredCount && c.monthlyCost === r.recommended.monthlyCost,
+    );
+    assert.ok(onFrontier, `recommendation off the frontier — ${where}`);
+
+    // (3) F-03: the receipt reconciles. Every recommended service appears in the
+    // marginal path, and the cumulative cost/coverage at the last of them equals
+    // the headline — so WHAT TO ADD is exactly the plan and sums to the total.
+    const recSlugs = new Set(r.recommended.addedServices);
+    const recPath = r.marginalPath.filter((m) => recSlugs.has(m.serviceId));
+    assert.equal(recPath.length, r.recommended.addedServices.length, `missing plan services in path — ${where}`);
+    if (recPath.length > 0) {
+      const last = recPath[recPath.length - 1];
+      assert.equal(last.monthlyCost, r.recommended.monthlyCost, `rows don't sum to headline — ${where}`);
+      assert.equal(last.coveredCount, r.recommended.coveredCount, `coverage mismatch — ${where}`);
+    }
+  }
+});
+
 test("catalog price snapshot is fresh (staleness alarm — re-verify prices and bump PRICES_AS_OF when this fails)", () => {
   const asOf = new Date(`${PRICES_AS_OF}-01T00:00:00Z`);
   assert.ok(!Number.isNaN(asOf.getTime()), "PRICES_AS_OF must be 'YYYY-MM'");
