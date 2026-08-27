@@ -1,9 +1,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getCached, setCached, CACHE_KEYS, CACHE_DURATION } from './_lib/redis.js';
+import { getCached, setCached, incrMetric, CACHE_KEYS, CACHE_DURATION } from './_lib/redis.js';
 import { sendError, sendValidationError, setCors, parseJsonBody } from './_lib/http.js';
 import { validate, array, string, optional, oneOf } from './_lib/validate.js';
 import { mapPool } from './_lib/pool.js';
 import { checkRateLimit } from './_lib/rate-limit.js';
+import { logMetric, resolveMetric } from './_lib/metrics.js';
 
 /**
  * Subplot — resolve imported watchlist titles to TMDb refs.
@@ -287,20 +288,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // hundreds of fetches; cache hits don't count against it.
   const scrapeBudget = { used: 0, max: 120 };
 
+  const t0 = Date.now();
   try {
     const found = await mapPool(result.value.films, 8, (f) => resolveOne(f, apiKey, scrapeBudget));
     const matches: Record<string, ResolveMatch> = {};
     const resolved: Record<string, TmdbRef> = {};
     const unresolved: string[] = [];
+    let movie = 0;
+    let tv = 0;
     result.value.films.forEach((film, i) => {
       const match = found[i];
       if (match) {
         matches[film.key] = match;
         resolved[film.key] = { mediaType: match.mediaType, id: match.id };
+        if (match.mediaType === 'tv') tv++;
+        else movie++;
       } else {
         unresolved.push(film.key);
       }
     });
+    // Aggregate instrumentation — counts + latency only, never a title or id.
+    logMetric(
+      resolveMetric({ imported: result.value.films.length, movie, tv, unresolved: unresolved.length, ms: Date.now() - t0 }),
+    );
+    void incrMetric('resolve:movie', movie);
+    void incrMetric('resolve:tv', tv);
+    void incrMetric('resolve:unresolved', unresolved.length);
+    void incrMetric('resolve:calls');
     // `matches` carries the display fields (title/year/poster) the review step
     // needs; `resolved` stays as the bare-ref map the pipeline consumes today.
     return res.status(200).json({ resolved, matches, unresolved });

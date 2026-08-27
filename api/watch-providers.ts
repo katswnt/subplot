@@ -1,9 +1,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getCached, setCached, CACHE_KEYS, CACHE_DURATION } from './_lib/redis.js';
+import { getCached, setCached, incrMetric, CACHE_KEYS, CACHE_DURATION } from './_lib/redis.js';
 import { sendError, sendValidationError, setCors, parseJsonBody } from './_lib/http.js';
 import { validate, array, number, string, oneOf } from './_lib/validate.js';
 import { mapPool } from './_lib/pool.js';
 import { checkRateLimit } from './_lib/rate-limit.js';
+import { logMetric, watchProvidersMetric } from './_lib/metrics.js';
 
 /**
  * Subplot — per-title streaming availability from TMDb watch/providers.
@@ -55,14 +56,17 @@ const mapOffers = (offers?: TmdbOffer[]): WatchProvider[] =>
       logoPath: o.logo_path || undefined,
     }));
 
-async function fetchProviders(ref: TmdbRef, region: string, apiKey: string): Promise<FilmProviders | null> {
+/** Provider lookup + whether it was served from cache (for the cache-hit metric). */
+type ProviderOutcome = { providers: FilmProviders | null; hit: boolean };
+
+async function fetchProviders(ref: TmdbRef, region: string, apiKey: string): Promise<ProviderOutcome> {
   const cacheKey = `${CACHE_KEYS.WATCH_PROVIDERS}${region}:${ref.mediaType}:${ref.id}`;
   const cached = await getCached<FilmProviders>(cacheKey);
-  if (cached) return cached;
+  if (cached) return { providers: cached, hit: true };
 
   const url = `${TMDB}/${ref.mediaType}/${ref.id}/watch/providers?api_key=${apiKey}`;
   const res = await fetch(url, { headers: { Accept: 'application/json' } });
-  if (!res.ok) return null;
+  if (!res.ok) return { providers: null, hit: false };
   const data = (await res.json()) as { results?: Record<string, TmdbRegion> };
   const regionData = data.results?.[region];
   const providers: FilmProviders = {
@@ -74,7 +78,7 @@ async function fetchProviders(ref: TmdbRef, region: string, apiKey: string): Pro
     link: regionData?.link,
   };
   await setCached(cacheKey, providers, CACHE_DURATION.WATCH_PROVIDERS);
-  return providers;
+  return { providers, hit: false };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -110,13 +114,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // De-dupe by ref key so a title on the list twice costs one TMDb call.
   const uniqueRefs = [...new Map(refs.map((r) => [refKey(r), r])).values()];
 
+  const t0 = Date.now();
   try {
-    const fetched = await mapPool(uniqueRefs, 8, (ref) => fetchProviders(ref, region, apiKey));
+    const outcomes = await mapPool(uniqueRefs, 8, (ref) => fetchProviders(ref, region, apiKey));
     const providers: Record<string, FilmProviders> = {};
+    let cacheHits = 0;
+    let fetched = 0;
+    let failed = 0;
     uniqueRefs.forEach((ref, i) => {
-      const p = fetched[i];
-      if (p) providers[refKey(ref)] = p;
+      const o = outcomes[i];
+      if (o.hit) cacheHits++;
+      if (o.providers) {
+        providers[refKey(ref)] = o.providers;
+        if (!o.hit) fetched++;
+      } else {
+        failed++;
+      }
     });
+    // Aggregate instrumentation — counts + latency only, never a ref or id.
+    logMetric(watchProvidersMetric({ requested: uniqueRefs.length, cacheHits, fetched, failed, ms: Date.now() - t0 }));
+    void incrMetric('wp:requested', uniqueRefs.length);
+    void incrMetric('wp:cacheHits', cacheHits);
+    void incrMetric('wp:failed', failed);
+    void incrMetric('wp:calls');
     return res.status(200).json({ region, providers });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Failed to fetch watch providers.';

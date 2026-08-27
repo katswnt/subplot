@@ -76,6 +76,20 @@ export async function setCached(key: string, value: unknown, expiresInSeconds?: 
   }
 }
 
+/** Best-effort aggregate counter for instrumentation. No-op without Redis, and
+ *  never throws. Callers pass anonymous tallies only (counts, never an id or
+ *  title). Key namespace: `subplot:m:<field>`. */
+export async function incrMetric(field: string, by = 1): Promise<void> {
+  if (!by) return;
+  const client = getRedis();
+  if (!client) return;
+  try {
+    await client.incrby(`subplot:m:${field}`, by);
+  } catch (err) {
+    console.error('Redis incrMetric error:', err);
+  }
+}
+
 // Subplot cache-key namespace (shares the Redis instance with Letterbddy).
 // v2 resolve / v3 wp: cached values are now media-typed refs, and provider keys
 // carry the media type — bumped so a pre-TV bare-id entry is never misread.
