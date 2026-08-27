@@ -282,20 +282,23 @@ export function optimizeStreaming(
   const perFilmBar = opts.dollarsPerFilm ?? (objective === 'value' ? 2 : 4);
   const recCap = objective === 'fewest' ? Math.min(3, maxServices) : maxServices;
 
-  // Append services to `out` greedily by marginal films (ties → cheaper, then
-  // slug), mutating covered/used. A film on several services is counted once.
+  // Append services from `pool` to `out` greedily by marginal films (ties →
+  // cheaper, then slug), mutating covered/used. A film on several services is
+  // counted once. Passing a restricted pool (e.g. just the recommended combo's
+  // services) orders exactly those; passing all candidates orders the full tail.
   const appendGreedyByFilms = (
+    pool: readonly string[],
     covered: Set<string>,
     used: Set<string>,
     startCost: number,
     out: MarginalAddition[],
   ) => {
     let runningCost = startCost;
-    while (used.size < candidates.length) {
+    while (true) {
       let best: string | null = null;
       let bestNew = -1;
       let bestCost = Infinity;
-      for (const slug of candidates) {
+      for (const slug of pool) {
         if (used.has(slug)) continue;
         let n = 0;
         for (const k of coverage.get(slug) ?? []) if (!covered.has(k)) n++;
@@ -320,14 +323,25 @@ export function optimizeStreaming(
 
   if (budget != null) {
     // Budget: recommend the richest AFFORDABLE combo from the exact Pareto
-    // frontier (max coverage within the cap). marginalPath is a plain greedy chain.
-    marginalPath = [];
-    appendGreedyByFilms(new Set(baseline), new Set(), 0, marginalPath);
+    // frontier (max coverage within the cap).
     recommended = frontier[0]; // cheapest = baseline (cost 0)
     for (const c of frontier) {
       if (c.monthlyCost <= budget) recommended = c; // frontier is cost-ascending
       else break;
     }
+    // Build marginalPath so its HEAD is exactly the recommended combo's services
+    // (greedy order among them), then greedily append the rest as the "if you
+    // want more" tail. This keeps the receipt's WHAT TO ADD rows identical to the
+    // plan the headline charges for — one source, not two that can disagree. (A
+    // frontier combo is non-dominated, so every one of its services adds ≥1 film
+    // in greedy order and none are dropped by the marginal-films filter.)
+    const covered = new Set(baseline);
+    const used = new Set<string>();
+    const recEntries: MarginalAddition[] = [];
+    appendGreedyByFilms(recommended.addedServices, covered, used, 0, recEntries);
+    const moreEntries: MarginalAddition[] = [];
+    appendGreedyByFilms(candidates, covered, used, recEntries.at(-1)?.monthlyCost ?? 0, moreEntries);
+    marginalPath = [...recEntries, ...moreEntries];
   } else {
     // No budget → value-aware greedy. Phase 1 builds the recommended set by
     // picking, at each step, the service unlocking the most new films AMONG those
@@ -371,7 +385,7 @@ export function optimizeStreaming(
     }
     recommended = makeCombo(recEntries.map((e) => e.serviceId));
     const moreEntries: MarginalAddition[] = [];
-    appendGreedyByFilms(covered, used, runningCost, moreEntries);
+    appendGreedyByFilms(candidates, covered, used, runningCost, moreEntries);
     marginalPath = [...recEntries, ...moreEntries];
   }
 
