@@ -129,12 +129,35 @@ const isConfident = (film: FilmInput, match: ResolveMatch): boolean => {
  *  a single 600-title request can't amplify into 600 scrapes. */
 type ScrapeBudget = { used: number; max: number };
 
+/** Hosts our server is willing to fetch when following a Letterboxd link. */
+const LB_HOST_ALLOWED = /^https?:\/\/(boxd\.it|letterboxd\.com)\//i;
+
+/**
+ * Fetch a Letterboxd URL, re-validating the host on EVERY redirect hop. `boxd.it`
+ * is a shortener, so a hop is expected — but following redirects blindly would
+ * let a crafted short link point our server's egress at an arbitrary host (SSRF).
+ * We follow manually and re-check the allowlist per hop instead. Returns the
+ * final Response, or null if a hop leaves the allowlist or the chain is too long.
+ */
+async function fetchWithinAllowlist(startUrl: string, headers: HeadersInit, maxHops = 5): Promise<Response | null> {
+  let url = startUrl;
+  for (let hop = 0; hop <= maxHops; hop++) {
+    if (!LB_HOST_ALLOWED.test(url)) return null; // re-validate the destination each hop
+    const res = await fetch(url, { redirect: 'manual', headers });
+    if (res.status < 300 || res.status >= 400) return res; // not a redirect → done
+    const location = res.headers.get('location');
+    if (!location) return null;
+    url = new URL(location, url).toString(); // resolve relative redirects, then re-check next loop
+  }
+  return null; // redirect chain too long
+}
+
 async function resolveViaLetterboxd(
   uri: string,
   apiKey: string,
   budget: ScrapeBudget,
 ): Promise<ResolveMatch | null> {
-  if (!/^https?:\/\/(boxd\.it|letterboxd\.com)\//i.test(uri)) return null;
+  if (!LB_HOST_ALLOWED.test(uri)) return null;
   const cacheKey = `${CACHE_KEYS.RESOLVE_LB}${uri}`;
   const cached = await getCached<ResolveMatch>(cacheKey);
   if (cached) return cached;
@@ -145,11 +168,10 @@ async function resolveViaLetterboxd(
 
   let html: string;
   try {
-    const res = await fetch(uri, {
-      redirect: 'follow',
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SubplotBot/1.0; +https://subplot.katswint.com)' },
+    const res = await fetchWithinAllowlist(uri, {
+      'User-Agent': 'Mozilla/5.0 (compatible; SubplotBot/1.0; +https://subplot.katswint.com)',
     });
-    if (!res.ok) return null;
+    if (!res || !res.ok) return null;
     html = await res.text();
   } catch {
     return null;
