@@ -70,3 +70,35 @@ describe('explain formatters', () => {
     expect(steps.every((s) => s.addFilms > 0)).toBe(true);
   });
 });
+
+describe('receipt consistency — budget mode', () => {
+  // Provider ids: Netflix 8 ($7.99), Shudder 99 ($6.99), MGM+ 34 ($6.99).
+  // Netflix alone covers the most films, so a greedy-by-films chain leads with it.
+  // But within a $14 cap the best-coverage affordable plan is Shudder+MGM+ (6
+  // films, $13.98) — a different service set. The receipt must show that plan,
+  // not the greedy leader. This reproduces F-03 (explanation vs algorithm drift).
+  const NETFLIX = 8, SHUDDER = 99, MGM = 34;
+  const budgetFilms = [
+    ...Array.from({ length: 5 }, (_, i) => film(`n${i}`, [NETFLIX])),
+    ...Array.from({ length: 3 }, (_, i) => film(`s${i}`, [SHUDDER])),
+    ...Array.from({ length: 3 }, (_, i) => film(`m${i}`, [MGM])),
+  ];
+
+  it('recommends the affordable frontier combo, not the greedy leader', () => {
+    const r = optimizeStreaming(budgetFilms, { region: 'US', maxBudget: 14 });
+    expect([...r.recommended.addedServices].sort()).toEqual(['mgm-plus', 'shudder']);
+    expect(r.recommended.monthlyCost).toBeCloseTo(13.98, 2);
+  });
+
+  it('WHAT TO ADD rows are exactly the recommended plan and sum to the headline', () => {
+    const r = optimizeStreaming(budgetFilms, { region: 'US', maxBudget: 14 });
+    const recSteps = marginalSteps(r).filter((s) => s.recommended);
+    // Rows == recommended plan (not the greedy leader, which would be netflix).
+    expect(recSteps.map((s) => s.slug).sort()).toEqual(['mgm-plus', 'shudder']);
+    // Rows reconcile with the headline total — the core "explainable" guarantee.
+    const rowsCost = Math.round(recSteps.reduce((a, s) => a + s.addCost, 0) * 100) / 100;
+    expect(rowsCost).toBeCloseTo(r.recommended.monthlyCost, 2);
+    // And with the headline coverage.
+    expect(recSteps[recSteps.length - 1].coveredCount).toBe(r.recommended.coveredCount);
+  });
+});

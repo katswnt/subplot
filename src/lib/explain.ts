@@ -88,8 +88,15 @@ export type MarginalStep = {
  * The greedy marginal path as "add X for +N new films (+$Y)" steps — one row
  * per service, best-value first. Because it's a nested chain, each service
  * appears once and films shared across services are never double-counted.
+ *
+ * A step is `recommended` iff its service is actually IN the recommended plan
+ * (`recommended.addedServices`) — never by cost comparison. Flagging by price
+ * let the WHAT TO ADD rows drift from the headline in budget mode, where the
+ * recommended combo and the greedy path could be different services at the same
+ * cost; membership ties the explanation to the algorithm's actual choice.
  */
 export function marginalSteps(result: StreamingResult): MarginalStep[] {
+  const inPlan = new Set(result.recommended.addedServices)
   let prevCost = 0
   return result.marginalPath.map((m) => {
     const step: MarginalStep = {
@@ -99,7 +106,7 @@ export function marginalSteps(result: StreamingResult): MarginalStep[] {
       monthlyCost: m.monthlyCost,
       addFilms: m.addedFilms,
       addCost: Math.round((m.monthlyCost - prevCost) * 100) / 100,
-      recommended: m.monthlyCost <= result.recommended.monthlyCost,
+      recommended: inPlan.has(m.serviceId),
     }
     prevCost = m.monthlyCost
     return step
