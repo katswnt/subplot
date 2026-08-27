@@ -188,8 +188,10 @@ Subplot cannot guarantee:
   film.
 - Redis stores shared film-ID mappings and region/provider responses, not user
   identity or a record linking a watchlist to a person.
-- There is currently no authentication, analytics SDK, or watchlist database in
-  the standalone app.
+- There is no authentication, client-side analytics SDK, or watchlist database in
+  the standalone app. Server-side instrumentation is **aggregate only** — counts,
+  ratios, and latency, never a title or identifier (see
+  [docs/instrumentation.md](docs/instrumentation.md)).
 
 ## Reliability and testing
 
@@ -238,10 +240,14 @@ watchlist contents.
   - **Provider-batch failure rate** and **cache-hit rate** — health of the TMDb
     seam.
 
-**Instrumentation plan (unbuilt):** structured, aggregate server-side logs of
-these rates plus p50/p95 latency per handler — counts and ratios only, never a
-watchlist or an identifier — so the funnel is observable without breaking the
-privacy guarantee. This is the `Observability` row in the table below.
+**Instrumentation (Tier 1 built):** each handler emits a structured, aggregate
+server-side log line — resolution rate, movie/TV mix, cache-hit rate,
+provider-batch failure rate, and latency — counts and ratios only, never a
+watchlist or an identifier, with a few best-effort Redis headline counters. The
+activation funnel and north-star are computed client-side, so they need a small
+aggregate beacon (Tier 2), specced but unbuilt pending real traffic. Full plan in
+[docs/instrumentation.md](docs/instrumentation.md); this is the `Observability`
+row in the table below.
 
 ## Known gaps and next decisions
 
@@ -256,7 +262,7 @@ These are open work, not accidental guarantees:
 | API abuse controls | Inputs, sizes, methods, and concurrency are bounded; endpoints are now per-IP rate limited and live scrapes are capped per request. They remain unauthenticated with permissive CORS. | Meaningful public traffic. Add quota/latency monitoring, an origin/token check, and a WAF rule before opening up further. |
 | Network-level test coverage | An integration test drives the resolve → availability → optimize pipeline against mocked `fetch` responses. The serverless handlers themselves still have no contract test against recorded TMDb payloads. | Refactoring API boundaries or supporting more regions/providers. |
 | End-to-end coverage | The pipeline integration test covers the client seam with mocked network; there is still no full browser test that imports a fixture through the rendered UI. | Frequent UI or deployment changes. |
-| Observability | Errors reach the user, but there are no product-specific dashboards for resolution rate, provider failures, cache hit rate, or latency. | Operating the app as more than a portfolio-scale public demo. |
+| Observability | Aggregate server-side metric logs + Redis counters are live for resolution rate, movie/TV mix, cache-hit rate, provider-batch failure, and latency (Tier 1). The client-side activation funnel and north-star still need an aggregate beacon (Tier 2, specced, unbuilt). | Operating the app as more than a portfolio-scale public demo → build Tier 2. |
 
 ## Questions this project should prompt
 
